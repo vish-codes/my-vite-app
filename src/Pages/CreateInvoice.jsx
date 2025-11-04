@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import DashboardPdf from "../Components/DashboardPdf";
+import GeneratePDF from "./GeneratePDF";
 
 const API_URL = "https://pgsql-invoice.onrender.com/api/invoices";
 
@@ -20,6 +21,7 @@ const CreateInvoice = () => {
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showSample, setShowSample] = useState(false); // renamed for clarity
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [deleteId, setDeleteId] = useState(null);
@@ -45,12 +47,23 @@ const CreateInvoice = () => {
     }
   }
 
-  // 🔹 Form Handlers
+  // 🔹 Handlers
+  const resetAllViews = () => {
+    setShowForm(false);
+    setShowPreview(false);
+    setShowSample(false);
+  };
+
   const handleOpenForm = () => {
     setFormData(emptyForm);
     setEditingId(null);
+    resetAllViews();
     setShowForm(true);
-    setShowPreview(false);
+  };
+
+  const handleShowSample = () => {
+    resetAllViews();
+    setShowSample(true);
   };
 
   const handleEdit = (invoice) => {
@@ -65,8 +78,8 @@ const CreateInvoice = () => {
       over_time: invoice.over_time?.toString?.() || "",
     });
     setEditingId(invoice.id);
+    resetAllViews();
     setShowForm(true);
-    setShowPreview(false);
   };
 
   const handleChange = (e) => {
@@ -76,12 +89,12 @@ const CreateInvoice = () => {
 
   const handleFormSubmit = (e) => {
     e.preventDefault();
+    resetAllViews();
     setShowPreview(true);
-    setShowForm(false);
   };
 
   const handleEditPreview = () => {
-    setShowPreview(false);
+    resetAllViews();
     setShowForm(true);
   };
 
@@ -122,10 +135,9 @@ const CreateInvoice = () => {
       }
 
       await fetchInvoices();
-      setShowPreview(false);
-      setShowForm(false);
-      setEditingId(null);
+      resetAllViews();
       setFormData(emptyForm);
+      setEditingId(null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -169,18 +181,26 @@ const CreateInvoice = () => {
         )}
         {loading && <div className="text-blue-600 mb-3">Loading...</div>}
 
-        {!showForm && !showPreview && (
-          <div className="flex justify-end mb-6">
+        {/* Buttons when no view active */}
+        {!showForm && !showPreview && !showSample && (
+          <div className="flex justify-end gap-4 mb-6">
             <button
               onClick={handleOpenForm}
               className="px-4 py-2 bg-blue-700 hover:bg-blue-900 text-white font-semibold rounded-md shadow"
             >
               Add Invoice
             </button>
+            <button
+              onClick={handleShowSample}
+              className="px-4 py-2 bg-blue-700 hover:bg-blue-900 text-white font-semibold rounded-md shadow"
+            >
+              Sample Invoice
+            </button>
           </div>
         )}
 
-        {!showForm && !showPreview && (
+        {/* Table View */}
+        {!showForm && !showPreview && !showSample && (
           <div className="overflow-x-auto pb-8">
             <table className="min-w-full border text-center">
               <thead>
@@ -240,6 +260,7 @@ const CreateInvoice = () => {
           </div>
         )}
 
+        {/* Delete Confirmation */}
         {deleteId && (
           <div className="mb-6 bg-yellow-50 p-4 rounded flex flex-col gap-2 border border-yellow-200">
             <span>Are you sure you want to delete invoice ID {deleteId}?</span>
@@ -260,6 +281,7 @@ const CreateInvoice = () => {
           </div>
         )}
 
+        {/* Form View */}
         {showForm && (
           <form onSubmit={handleFormSubmit} className="space-y-4">
             <div>
@@ -383,7 +405,7 @@ const CreateInvoice = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setShowForm(false);
+                  resetAllViews();
                   setFormData(emptyForm);
                   setEditingId(null);
                 }}
@@ -395,6 +417,7 @@ const CreateInvoice = () => {
           </form>
         )}
 
+        {/* Preview View */}
         {showPreview && (
           <div className="bg-gray-50 border p-4 rounded">
             <h2 className="font-bold text-lg mb-3 text-blue-700">Preview</h2>
@@ -420,6 +443,21 @@ const CreateInvoice = () => {
                 className="px-4 py-2 bg-green-700 hover:bg-green-900 text-white font-semibold rounded-md shadow"
               >
                 Submit
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Sample Invoice View */}
+        {showSample && (
+          <div className="mt-4">
+            <GeneratePDF />
+            <div className="flex justify-center mt-4">
+              <button
+                onClick={() => resetAllViews()}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-800 text-white font-semibold rounded-md shadow"
+              >
+                Back to List
               </button>
             </div>
           </div>

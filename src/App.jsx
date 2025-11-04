@@ -31,7 +31,7 @@ function App() {
   // GET data ------------------------------------ //
   useEffect(() => {
     async function fetchData() {
-      setIsLoading(true);
+      setIsLoading(false);
       try {
         const response = await fetch(
           "https://panorama-server-i79k.onrender.com/api/v1/allLaptops"
@@ -54,7 +54,7 @@ function App() {
 
   async function getHistoryData() {
     if (!getIdForHistory) return;
-    setIsLoading(true);
+    setIsLoading(false);
     try {
       const response = await fetch(
         `https://panorama-server-i79k.onrender.com/api/v1/history/${getIdForHistory}`
@@ -81,7 +81,7 @@ function App() {
 
     const token = localStorage.getItem("token");
     try {
-      setIsLoading(true);
+      setIsLoading(false);
       const response = await fetch(
         `https://panorama-server-i79k.onrender.com/api/v1/delete/${id}`,
         {
@@ -112,7 +112,7 @@ function App() {
     if (!(getLaptopId || details)) return;
     const token = localStorage.getItem("token");
     try {
-      setIsLoading(true);
+      setIsLoading(false);
       const response = await fetch(
         `https://panorama-server-i79k.onrender.com/api/v1/reAssign/${getLaptopId}`,
         {
@@ -188,7 +188,7 @@ function App() {
     >
       <BrowserRouter>
         <Routes>
-          <Route index element={<Landing />} />
+          <Route index element={<DashBoard />} />
           <Route path="/login" element={<Login />} />
           {/* <Route path="/appointment" element={<Appointment />} /> */}
           <Route>
