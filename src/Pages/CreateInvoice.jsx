@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import DashboardPdf from "../Components/DashboardPdf";
 import GeneratePDF from "./GeneratePDF";
+import { useNavigate } from "react-router-dom"; 
 
 // const API_URL = "http://localhost:3000/api/invoices";
 const API_URL = "https://pgsql-invoice.onrender.com/api/invoices";
@@ -26,7 +27,7 @@ const CreateInvoice = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [deleteId, setDeleteId] = useState(null);
-
+  const navigate = useNavigate();
   useEffect(() => {
     fetchInvoices();
   }, []);
@@ -171,9 +172,8 @@ const CreateInvoice = () => {
       const res = await fetch(`${API_URL}/${id}`);
       if (!res.ok) throw new Error("Failed to fetch invoice details");
       const invoiceData = await res.json();
-      console.log("Fetched invoice:", invoiceData);
-      // Call your PDF generator function here
-      // Example: GeneratePDF(invoiceData);
+      console.log("🧾 Fetched invoice:", invoiceData);
+      navigate("/genpdf", { state: { invoice: invoiceData } }); // ✅ navigate with data
     } catch (err) {
       setError(err.message);
     } finally {
