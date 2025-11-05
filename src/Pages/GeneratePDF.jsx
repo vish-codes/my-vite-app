@@ -9,7 +9,7 @@ const GeneratePDF = () => {
 
   // ✅ Static Invoice Data
   const commonDataForPdf = {
-    invoiceNo: "INV-001",
+    invoiceNo: "INV-002",
     dateOfInvoice: "2024-07-30",
     companyName: "Acme Corporation Pvt Ltd",
     add1: "Plot No. 21, Industrial Area",
@@ -189,7 +189,7 @@ const GeneratePDF = () => {
 
     // Generate Blob URL for Preview
     if (status === "active") {
-      doc.save(`${commonDataForPdf.companyName}.pdf`);
+      doc.save(`${commonDataForPdf.clientName}.pdf`);
     } else {
       const pdfBlob = doc.output("blob");
       const url = URL.createObjectURL(pdfBlob);
