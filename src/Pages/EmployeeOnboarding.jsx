@@ -1,20 +1,20 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from "react"
-import { Plus, AlertCircle, CheckCircle } from "lucide-react"
-import { AgGridReact } from "ag-grid-react"
-import "ag-grid-community/styles/ag-grid.css"
-import "ag-grid-community/styles/ag-theme-quartz.css"
-import DashboardPdf from "../Components/DashboardPdf"
+import { useState, useEffect, useRef } from "react";
+import { Plus, AlertCircle, CheckCircle } from "lucide-react";
+import { AgGridReact } from "ag-grid-react";
+import "ag-grid-community/styles/ag-grid.css";
+import "ag-grid-community/styles/ag-theme-quartz.css";
+import DashboardPdf from "../Components/DashboardPdf";
 
-const API_URL = "https://pgsql-invoice.onrender.com/api/employee"
+const API_URL = "https://pgsql-invoice.onrender.com/api/employee";
 
 const emptyForm = {
   name: "",
   position: "",
   working_on: "",
   emp_code: "",
-}
+};
 
 const ActionCellRenderer = ({ data, onEdit, onDelete }) => (
   <div className="flex gap-2 justify-end h-full items-center">
@@ -31,79 +31,82 @@ const ActionCellRenderer = ({ data, onEdit, onDelete }) => (
       Delete
     </button>
   </div>
-)
+);
 
 const EmployeeOnboarding = () => {
-  const [employees, setEmployees] = useState([])
-  const [formData, setFormData] = useState(emptyForm)
-  const [editingId, setEditingId] = useState(null)
-  const [showForm, setShowForm] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
-  const [deleteId, setDeleteId] = useState(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [validationErrors, setValidationErrors] = useState({})
-  const gridApiRef = useRef(null)
+  const [employees, setEmployees] = useState([]);
+  const [formData, setFormData] = useState(emptyForm);
+  const [editingId, setEditingId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [deleteId, setDeleteId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
+  const gridApiRef = useRef(null);
 
   useEffect(() => {
-    fetchEmployees()
-  }, [])
+    fetchEmployees();
+  }, []);
 
   useEffect(() => {
     if (error || success) {
       const timer = setTimeout(() => {
-        setError("")
-        setSuccess("")
-      }, 5000)
-      return () => clearTimeout(timer)
+        setError("");
+        setSuccess("");
+      }, 5000);
+      return () => clearTimeout(timer);
     }
-  }, [error, success])
+  }, [error, success]);
 
   const onGridReady = (params) => {
-    gridApiRef.current = params.api
-    params.api.sizeColumnsToFit()
+    gridApiRef.current = params.api;
+    params.api.sizeColumnsToFit();
     window.addEventListener("resize", () => {
       setTimeout(() => {
-        params.api.sizeColumnsToFit()
-      })
-    })
-  }
+        params.api.sizeColumnsToFit();
+      });
+    });
+  };
 
   const fetchEmployees = async () => {
-    setLoading(true)
-    setError("")
+    setLoading(true);
+    setError("");
     try {
-      const res = await fetch(API_URL)
-      if (!res.ok) throw new Error("Failed to fetch employees")
-      const data = await res.json()
-      setEmployees(data)
+      const res = await fetch(API_URL);
+      if (!res.ok) throw new Error("Failed to fetch employees");
+      const data = await res.json();
+      setEmployees(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch employees")
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch employees"
+      );
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const validateForm = () => {
-    const errors = {}
+    const errors = {};
 
-    if (!formData.name.trim()) errors.name = "Employee name is required"
-    if (!formData.position.trim()) errors.position = "Position is required"
-    if (!formData.working_on.trim()) errors.working_on = "Working on is required"
+    if (!formData.name.trim()) errors.name = "Employee name is required";
+    if (!formData.position.trim()) errors.position = "Position is required";
+    if (!formData.working_on.trim())
+      errors.working_on = "Working on is required";
 
-    setValidationErrors(errors)
-    return Object.keys(errors).length === 0
-  }
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleOpenForm = () => {
-    setFormData(emptyForm)
-    setEditingId(null)
-    setShowForm(true)
-    setShowPreview(false)
-    setValidationErrors({})
-  }
+    setFormData(emptyForm);
+    setEditingId(null);
+    setShowForm(true);
+    setShowPreview(false);
+    setValidationErrors({});
+  };
 
   const handleEditEmployee = (employee) => {
     setFormData({
@@ -111,86 +114,92 @@ const EmployeeOnboarding = () => {
       position: employee.position || "",
       working_on: employee.working_on || "",
       emp_code: employee.emp_code || "",
-    })
-    setEditingId(employee.id)
-    setShowForm(true)
-    setShowPreview(false)
-    setValidationErrors({})
-  }
+    });
+    setEditingId(employee.id);
+    setShowForm(true);
+    setShowPreview(false);
+    setValidationErrors({});
+  };
 
   const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData({ ...formData, [name]: value })
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
     if (validationErrors[name]) {
-      setValidationErrors({ ...validationErrors, [name]: "" })
+      setValidationErrors({ ...validationErrors, [name]: "" });
     }
-  }
+  };
 
   const handleFormSubmit = (e) => {
-    e.preventDefault()
-    if (!validateForm()) return
-    setShowPreview(true)
-    setShowForm(false)
-  }
+    e.preventDefault();
+    if (!validateForm()) return;
+    setShowPreview(true);
+    setShowForm(false);
+  };
 
   const handleEditPreview = () => {
-    setShowPreview(false)
-    setShowForm(true)
-  }
+    setShowPreview(false);
+    setShowForm(true);
+  };
 
   const handleFinalSubmit = async () => {
-    setLoading(true)
-    setError("")
+    setLoading(true);
+    setError("");
     try {
-      const method = editingId ? "PUT" : "POST"
-      const url = editingId ? `${API_URL}/${editingId}` : API_URL
+      const method = editingId ? "PUT" : "POST";
+      const url = editingId ? `${API_URL}/${editingId}` : API_URL;
 
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
-      })
+      });
 
-      if (!res.ok) throw new Error("Failed to save employee")
+      if (!res.ok) throw new Error("Failed to save employee");
 
-      await fetchEmployees()
-      setShowPreview(false)
-      setShowForm(false)
-      setEditingId(null)
-      setFormData(emptyForm)
-      setSuccess(editingId ? "Employee updated successfully!" : "Employee added successfully!")
+      await fetchEmployees();
+      setShowPreview(false);
+      setShowForm(false);
+      setEditingId(null);
+      setFormData(emptyForm);
+      setSuccess(
+        editingId
+          ? "Employee updated successfully!"
+          : "Employee added successfully!"
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save employee")
+      setError(err instanceof Error ? err.message : "Failed to save employee");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const handleDelete = (id) => setDeleteId(id)
+  const handleDelete = (id) => setDeleteId(id);
 
   const confirmDelete = async () => {
-    if (!deleteId) return
-    setLoading(true)
-    setError("")
+    if (!deleteId) return;
+    setLoading(true);
+    setError("");
     try {
-      const res = await fetch(`${API_URL}/${deleteId}`, { method: "DELETE" })
-      if (!res.ok) throw new Error("Failed to delete employee")
-      await fetchEmployees()
-      setDeleteId(null)
-      setSuccess("Employee deleted successfully!")
+      const res = await fetch(`${API_URL}/${deleteId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete employee");
+      await fetchEmployees();
+      setDeleteId(null);
+      setSuccess("Employee deleted successfully!");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete employee")
+      setError(
+        err instanceof Error ? err.message : "Failed to delete employee"
+      );
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const filteredEmployees = employees.filter(
     (employee) =>
       employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       employee.position.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      employee.emp_code.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+      employee.emp_code.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const columnDefs = [
     {
@@ -243,13 +252,17 @@ const EmployeeOnboarding = () => {
       headerName: "Actions",
       minWidth: 200,
       cellRenderer: (params) => (
-        <ActionCellRenderer data={params.data} onEdit={handleEditEmployee} onDelete={handleDelete} />
+        <ActionCellRenderer
+          data={params.data}
+          onEdit={handleEditEmployee}
+          onDelete={handleDelete}
+        />
       ),
       sortable: false,
       filter: false,
       resizable: true,
     },
-  ]
+  ];
 
   return (
     <div className="min-h-screen font-sans">
@@ -257,8 +270,12 @@ const EmployeeOnboarding = () => {
       <div className="max-w-7xl mx-auto p-4 md:p-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">Employee Management</h1>
-          <p className="text-slate-600">Manage and onboard your employees efficiently</p>
+          <h1 className="text-4xl font-bold text-slate-900 mb-2">
+            Employee Management
+          </h1>
+          <p className="text-slate-600">
+            Manage and onboard your employees efficiently
+          </p>
         </div>
 
         {error && (
@@ -292,9 +309,13 @@ const EmployeeOnboarding = () => {
         {showForm && (
           <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden">
             <div className="border-b border-slate-200 px-6 py-4">
-              <h2 className="text-2xl font-bold text-slate-900">{editingId ? "Edit Employee" : "Add New Employee"}</h2>
+              <h2 className="text-2xl font-bold text-slate-900">
+                {editingId ? "Edit Employee" : "Add New Employee"}
+              </h2>
               <p className="text-slate-600 text-sm mt-1">
-                {editingId ? "Update employee information" : "Fill in the details to add a new employee"}
+                {editingId
+                  ? "Update employee information"
+                  : "Fill in the details to add a new employee"}
               </p>
             </div>
             <div className="p-6">
@@ -312,10 +333,16 @@ const EmployeeOnboarding = () => {
                       onChange={handleChange}
                       placeholder="Enter employee name"
                       className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.name ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                        validationErrors.name
+                          ? "border-red-500 bg-red-50"
+                          : "border-slate-300 bg-white"
                       }`}
                     />
-                    {validationErrors.name && <p className="text-red-600 text-sm mt-1">{validationErrors.name}</p>}
+                    {validationErrors.name && (
+                      <p className="text-red-600 text-sm mt-1">
+                        {validationErrors.name}
+                      </p>
+                    )}
                   </div>
 
                   {/* Position */}
@@ -330,11 +357,15 @@ const EmployeeOnboarding = () => {
                       onChange={handleChange}
                       placeholder="Enter position"
                       className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.position ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                        validationErrors.position
+                          ? "border-red-500 bg-red-50"
+                          : "border-slate-300 bg-white"
                       }`}
                     />
                     {validationErrors.position && (
-                      <p className="text-red-600 text-sm mt-1">{validationErrors.position}</p>
+                      <p className="text-red-600 text-sm mt-1">
+                        {validationErrors.position}
+                      </p>
                     )}
                   </div>
 
@@ -350,18 +381,24 @@ const EmployeeOnboarding = () => {
                       onChange={handleChange}
                       placeholder="Project/Department"
                       className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.working_on ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                        validationErrors.working_on
+                          ? "border-red-500 bg-red-50"
+                          : "border-slate-300 bg-white"
                       }`}
                     />
                     {validationErrors.working_on && (
-                      <p className="text-red-600 text-sm mt-1">{validationErrors.working_on}</p>
+                      <p className="text-red-600 text-sm mt-1">
+                        {validationErrors.working_on}
+                      </p>
                     )}
                   </div>
 
                   {/* Employee Code */}
                   <div>
                     <label className="block text-sm font-medium text-slate-900 mb-2">
-                      Employee Code <span className="text-slate-500 text-xs">(Optional)</span>
+                      Employee Code
+                      {/* <span className="text-slate-500 text-xs">(Optional)</span> */}
+                      Working On <span className="text-red-600">*</span> 
                     </label>
                     <input
                       type="text"
@@ -370,11 +407,15 @@ const EmployeeOnboarding = () => {
                       onChange={handleChange}
                       placeholder="Enter employee code"
                       className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.emp_code ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                        validationErrors.emp_code
+                          ? "border-red-500 bg-red-50"
+                          : "border-slate-300 bg-white"
                       }`}
                     />
                     {validationErrors.emp_code && (
-                      <p className="text-red-600 text-sm mt-1">{validationErrors.emp_code}</p>
+                      <p className="text-red-600 text-sm mt-1">
+                        {validationErrors.emp_code}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -384,10 +425,10 @@ const EmployeeOnboarding = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      setShowForm(false)
-                      setFormData(emptyForm)
-                      setEditingId(null)
-                      setValidationErrors({})
+                      setShowForm(false);
+                      setFormData(emptyForm);
+                      setEditingId(null);
+                      setValidationErrors({});
                     }}
                     className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
                   >
@@ -410,27 +451,47 @@ const EmployeeOnboarding = () => {
         {showPreview && (
           <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden border border-blue-200">
             <div className="border-b border-slate-200 px-6 py-4 bg-blue-50">
-              <h2 className="text-2xl font-bold text-slate-900">Preview & Confirm</h2>
-              <p className="text-slate-600 text-sm mt-1">Review the information before submitting</p>
+              <h2 className="text-2xl font-bold text-slate-900">
+                Preview & Confirm
+              </h2>
+              <p className="text-slate-600 text-sm mt-1">
+                Review the information before submitting
+              </p>
             </div>
             <div className="p-6">
               <div className="bg-slate-50 rounded-lg p-6 mb-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Employee Name</p>
-                    <p className="text-lg font-semibold text-slate-900">{formData.name}</p>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
+                      Employee Name
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {formData.name}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Position</p>
-                    <p className="text-lg font-semibold text-slate-900">{formData.position}</p>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
+                      Position
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {formData.position}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Working On</p>
-                    <p className="text-lg font-semibold text-slate-900">{formData.working_on}</p>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
+                      Working On
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {formData.working_on}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Employee Code</p>
-                    <p className="text-lg font-semibold font-mono text-slate-900">{formData.emp_code || "—"}</p>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
+                      Employee Code
+                    </p>
+                    <p className="text-lg font-semibold font-mono text-slate-900">
+                      {formData.emp_code || "—"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -460,8 +521,12 @@ const EmployeeOnboarding = () => {
             <div className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-semibold text-slate-900">Delete Employee?</p>
-                  <p className="text-sm text-slate-600 mt-1">This action cannot be undone.</p>
+                  <p className="font-semibold text-slate-900">
+                    Delete Employee?
+                  </p>
+                  <p className="text-sm text-slate-600 mt-1">
+                    This action cannot be undone.
+                  </p>
                 </div>
                 <div className="flex gap-3">
                   <button
@@ -490,15 +555,23 @@ const EmployeeOnboarding = () => {
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <div className="border-b border-slate-200 px-6 py-4">
                 <h3 className="text-lg font-semibold text-slate-900">
-                  Employees <span className="text-slate-500 font-normal">({filteredEmployees.length})</span>
+                  Employees{" "}
+                  <span className="text-slate-500 font-normal">
+                    ({filteredEmployees.length})
+                  </span>
                 </h3>
                 <p className="text-sm text-slate-600 mt-1">
                   {loading
                     ? "Loading employees..."
-                    : `Managing ${filteredEmployees.length} employee${filteredEmployees.length !== 1 ? "s" : ""}`}
+                    : `Managing ${filteredEmployees.length} employee${
+                        filteredEmployees.length !== 1 ? "s" : ""
+                      }`}
                 </p>
               </div>
-              <div className="ag-theme-quartz" style={{ height: "500px", width: "100%" }}>
+              <div
+                className="ag-theme-quartz"
+                style={{ height: "500px", width: "100%" }}
+              >
                 <AgGridReact
                   rowData={filteredEmployees}
                   columnDefs={columnDefs}
@@ -527,7 +600,7 @@ const EmployeeOnboarding = () => {
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default EmployeeOnboarding
+export default EmployeeOnboarding;

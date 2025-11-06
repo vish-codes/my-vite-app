@@ -435,7 +435,7 @@ const ClientOnboarding = () => {
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-slate-900 mb-2">
                       GST Number{" "}
-                      <span className="text-slate-500 text-xs">(Optional)</span>
+                      {/* <span className="text-slate-500 text-xs">(Optional)</span> */}
                     </label>
                     <input
                       type="text"
