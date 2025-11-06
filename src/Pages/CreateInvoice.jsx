@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import DashboardPdf from "../Components/DashboardPdf";
 import GeneratePDF from "./GeneratePDF";
+import { useNavigate } from "react-router-dom"; 
 
+// const API_URL = "http://localhost:3000/api/invoices";
 const API_URL = "https://pgsql-invoice.onrender.com/api/invoices";
 
 const emptyForm = {
@@ -21,16 +23,15 @@ const CreateInvoice = () => {
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [showSample, setShowSample] = useState(false); // renamed for clarity
+  const [showSample, setShowSample] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [deleteId, setDeleteId] = useState(null);
-
+  const navigate = useNavigate();
   useEffect(() => {
     fetchInvoices();
   }, []);
 
-  // 🔹 Fetch All Invoices
   async function fetchInvoices() {
     setLoading(true);
     setError("");
@@ -47,7 +48,6 @@ const CreateInvoice = () => {
     }
   }
 
-  // 🔹 Handlers
   const resetAllViews = () => {
     setShowForm(false);
     setShowPreview(false);
@@ -98,7 +98,6 @@ const CreateInvoice = () => {
     setShowForm(true);
   };
 
-  // 🔹 Final Submit (POST / PUT)
   const handleFinalSubmit = async () => {
     setLoading(true);
     setError("");
@@ -145,7 +144,6 @@ const CreateInvoice = () => {
     }
   };
 
-  // 🔹 Delete Invoice
   const handleDelete = (id) => setDeleteId(id);
 
   const confirmDelete = async () => {
@@ -167,7 +165,22 @@ const CreateInvoice = () => {
     }
   };
 
-  // 🔹 UI
+  const handleGeneratePdf = async (id) => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_URL}/${id}`);
+      if (!res.ok) throw new Error("Failed to fetch invoice details");
+      const invoiceData = await res.json();
+      console.log("🧾 Fetched invoice:", invoiceData);
+      navigate("/genpdf", { state: { invoice: invoiceData } }); // ✅ navigate with data
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="mx-auto">
       <DashboardPdf />
@@ -181,7 +194,6 @@ const CreateInvoice = () => {
         )}
         {loading && <div className="text-blue-600 mb-3">Loading...</div>}
 
-        {/* Buttons when no view active */}
         {!showForm && !showPreview && !showSample && (
           <div className="flex justify-end gap-4 mb-6">
             <button
@@ -199,7 +211,6 @@ const CreateInvoice = () => {
           </div>
         )}
 
-        {/* Table View */}
         {!showForm && !showPreview && !showSample && (
           <div className="overflow-x-auto pb-8">
             <table className="min-w-full border text-center">
@@ -246,10 +257,16 @@ const CreateInvoice = () => {
                           Edit
                         </button>
                         <button
-                          className="px-2 py-1 text-red-600 hover:underline"
+                          className="mr-2 px-2 py-1 text-red-600 hover:underline"
                           onClick={() => handleDelete(inv.id)}
                         >
                           Delete
+                        </button>
+                        <button
+                          className="px-2 py-1 text-green-700 hover:underline"
+                          onClick={() => handleGeneratePdf(inv.id)}
+                        >
+                          Generate PDF
                         </button>
                       </td>
                     </tr>
@@ -260,7 +277,6 @@ const CreateInvoice = () => {
           </div>
         )}
 
-        {/* Delete Confirmation */}
         {deleteId && (
           <div className="mb-6 bg-yellow-50 p-4 rounded flex flex-col gap-2 border border-yellow-200">
             <span>Are you sure you want to delete invoice ID {deleteId}?</span>
@@ -281,7 +297,6 @@ const CreateInvoice = () => {
           </div>
         )}
 
-        {/* Form View */}
         {showForm && (
           <form onSubmit={handleFormSubmit} className="space-y-4">
             <div>
@@ -417,7 +432,6 @@ const CreateInvoice = () => {
           </form>
         )}
 
-        {/* Preview View */}
         {showPreview && (
           <div className="bg-gray-50 border p-4 rounded">
             <h2 className="font-bold text-lg mb-3 text-blue-700">Preview</h2>
@@ -448,7 +462,6 @@ const CreateInvoice = () => {
           </div>
         )}
 
-        {/* Sample Invoice View */}
         {showSample && (
           <div className="mt-4">
             <GeneratePDF />
