@@ -1,21 +1,34 @@
 import React, { useState, useEffect } from "react";
 import { jsPDF } from "jspdf";
+import { useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import DashboardPdf from "../Components/DashboardPdf";
 
 const GeneratePDF = () => {
+  const location = useLocation();
+  const invoice = location.state?.invoice || {};
+  console.log("🧾 Received invoice data:", invoice);
+
   const [pdfUrl, setPdfUrl] = useState("");
   const [isPdfPreviewVisible, setIsPdfPreviewVisible] = useState(false);
 
   // ✅ Static Invoice Data
   const commonDataForPdf = {
-    invoiceNo: "INV-001",
-    dateOfInvoice: "2024-07-30",
-    companyName: "Acme Corporation Pvt Ltd",
-    add1: "Plot No. 21, Industrial Area",
+    invoiceNo: invoice?.invoice_no || "N/A",
+    dateOfInvoice: invoice?.issue_date
+      ? new Date(invoice.issue_date).toLocaleDateString()
+      : "N/A",
+    companyName: invoice?.company_name || "N/A",
+    companyAccountNumber: invoice?.company_bank_account_number|| "N/A",
+    companyIfscCode: invoice?.company_ifsc_code|| "N/A",
+    companyState: invoice?.company_state|| "N/A",
+    companyGst: invoice?.company_gst_number|| "N/A",
+    companyPan: invoice?.company_pan|| "N/A",
+    clientName:invoice?.client_name||"N/A",
+    clientAddress: invoice?.client_address||"N/A",
     add2: "Gurgaon, Haryana - 122001",
-    state: "Haryana / 06",
-    gstIn: "06ABCDE1234F1Z5",
+    clientState: invoice?.client_state||"N/A",
+    clientGst: invoice?.client_gst_number||"N/A",
     gstRate: 18,
     currencyType: "INR",
   };
@@ -23,9 +36,9 @@ const GeneratePDF = () => {
   const resourcesArr = [
     {
       userId: "123",
-      username: "John Doe",
-      workingOn: "Maf Carrefour",
-      sacCode: "2329",
+      employeeName: invoice?.employee_name||"Project Name",
+      workingOn: invoice?.project_name||"Project Name",
+      sacCode: "9983", //hard code
       fromDate: "1st July",
       toDate: "30th July 2024",
       days: 21,
@@ -34,7 +47,18 @@ const GeneratePDF = () => {
     },
     {
       userId: "124",
-      username: "Jane Smith",
+      employeeName: "Jane Smith",
+      workingOn: "Lulu Hypermarket",
+      sacCode: "9983",
+      fromDate: "1st July",
+      toDate: "31st July 2024",
+      days: 20,
+      hours: 8,
+      payPerDay: 3200,
+    },
+    {
+      userId: "125",
+      employeeName: "Poorvi Chauhan",
       workingOn: "Lulu Hypermarket",
       sacCode: "9983",
       fromDate: "1st July",
@@ -44,7 +68,7 @@ const GeneratePDF = () => {
       payPerDay: 3200,
     },
   ];
-
+// todo
   const calculateTotals = (gstRate) => {
     const subTotal = resourcesArr.reduce(
       (acc, val) => acc + val.payPerDay * val.days,
@@ -67,7 +91,7 @@ const GeneratePDF = () => {
 
     // Header
     doc.setFontSize(15);
-    doc.text("Panorama Software Solutions", 30, 32);
+    doc.text(commonDataForPdf.companyName, 30, 32); //panorama name
     doc.setFont("helvetica", "bold");
     doc.setTextColor(61, 121, 216);
     doc.text(`INVOICE NO: ${commonDataForPdf.invoiceNo}`, 112, 32);
@@ -87,11 +111,11 @@ const GeneratePDF = () => {
     doc.setFont("helvetica", "bold");
     doc.text("Bank Details:", 32, 60.5);
     doc.setFont("helvetica", "normal");
-    doc.text("Name - Panorama Software Solutions", 32, 65);
-    doc.text("Account No - 50200035450418", 32, 69);
-    doc.text("IFSC Code - HDFC0002253", 32, 73);
+    doc.text(`Name -${commonDataForPdf.companyName}`, 32, 65);
+    doc.text(`Account No - ${commonDataForPdf.companyAccountNumber}` , 32, 69);
+    doc.text(`IFSC Code - ${commonDataForPdf.companyIfscCode}`, 32, 73);
 
-    // Invoice Info
+    // Company Info
     doc.setFontSize(8.8);
     doc.setFont("helvetica", "bold");
     doc.text(`Date of Invoice: `, 130, 60.5);
@@ -100,11 +124,11 @@ const GeneratePDF = () => {
     doc.setFont("helvetica", "bold");
     doc.text("GSTIN: ", 130, 67);
     doc.setFont("helvetica", "normal");
-    doc.text("03AAWFP4507D1ZB", 141.8, 67);
+    doc.text(`${commonDataForPdf.companyGst}`, 141.8, 67);
     doc.setFont("helvetica", "bold");
     doc.text("PAN: ", 130, 73.5);
     doc.setFont("helvetica", "normal");
-    doc.text("AAWFP4507D", 139, 73.5);
+    doc.text(`${commonDataForPdf.companyPan}`, 139, 73.5);
 
     // Bill To
     doc.setFont("helvetica", "bold");
@@ -112,15 +136,15 @@ const GeneratePDF = () => {
     doc.text("BILL TO", 34, 85.5).rect(32, 81, 52, 7);
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(commonDataForPdf.companyName, 30, 98);
+    doc.text(commonDataForPdf.clientName, 30, 98);
     doc.setFontSize(9);
-    doc.text(commonDataForPdf.add1, 30, 106);
+    doc.text(commonDataForPdf.clientAddress, 30, 106);
     doc.text(commonDataForPdf.add2, 30, 110);
-    doc.text(commonDataForPdf.state, 30, 114);
+    doc.text(commonDataForPdf.clientState, 30, 114);
     doc.setFont("helvetica", "bold");
     doc.text("GSTIN: ", 30, 122);
     doc.setFont("helvetica", "normal");
-    doc.text(commonDataForPdf.gstIn, 43, 122);
+    doc.text(commonDataForPdf.clientGst, 43, 122);
 
     // Table
     const startY = 130;
@@ -145,14 +169,14 @@ const GeneratePDF = () => {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
       doc.text(
-        `Consultancy charges ${res.username} on ${res.workingOn} (${res.userId})`,
+        `Consultancy charges ${res.employeeName} on ${res.workingOn} (${res.userId})`,
         31.5,
         currentY
       );
       doc.text(`(${res.fromDate} - ${res.toDate})`, 31.5, currentY + 3.3);
       doc.setFont("helvetica", "bold");
       doc.text(
-        `${res.days} Days * ${res.hours} Hours * ${res.payPerDay} ${commonDataForPdf.currencyType}`,
+        `${res.days} Days * ${res.hours} Hours * ${res.payPerDay} ${commonDataForPdf.currencyType}`, //Total amount
         31.5,
         currentY + 6.7
       );
