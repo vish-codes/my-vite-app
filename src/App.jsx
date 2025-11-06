@@ -21,6 +21,8 @@ import CreateInvoice from "./Pages/CreateInvoice";
 
 export const AppContext = createContext("");
 
+const API_URL = "https://pgsql-invoice.onrender.com/api/clients";
+
 function App() {
   const [listData, setListData] = useState([]);
   const [getLaptopId, setGetLaptopId] = useState(null);
@@ -30,6 +32,20 @@ function App() {
 
   // GET data ------------------------------------ //
   useEffect(() => {
+      async function fetchClients() {
+      setIsLoading(true);
+      setError("");
+      try {
+        const res = await fetch(API_URL);
+        if (!res.ok) throw new Error("Failed to fetch clients");
+        await res.json();
+        setIsLoading(false);
+      } catch (err) {
+        console.error(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    }
     async function fetchData() {
       setIsLoading(false);
       try {
@@ -47,6 +63,7 @@ function App() {
         setIsLoading(false);
       }
     }
+    fetchClients();
     fetchData();
   }, []);
 
@@ -54,7 +71,7 @@ function App() {
 
   async function getHistoryData() {
     if (!getIdForHistory) return;
-    setIsLoading(false);
+    // setIsLoading(true);
     try {
       const response = await fetch(
         `https://panorama-server-i79k.onrender.com/api/v1/history/${getIdForHistory}`
@@ -66,8 +83,6 @@ function App() {
       setHistory(data);
     } catch (error) {
       console.error("ERROR: ", error);
-    } finally {
-      setIsLoading(false);
     }
   }
 
@@ -81,7 +96,7 @@ function App() {
 
     const token = localStorage.getItem("token");
     try {
-      setIsLoading(false);
+      // setIsLoading(true);
       const response = await fetch(
         `https://panorama-server-i79k.onrender.com/api/v1/delete/${id}`,
         {
@@ -96,8 +111,6 @@ function App() {
       setListData(data);
     } catch (error) {
       console.error(error);
-    } finally {
-      setIsLoading(false);
     }
   }
   useEffect(() => {
@@ -112,7 +125,7 @@ function App() {
     if (!(getLaptopId || details)) return;
     const token = localStorage.getItem("token");
     try {
-      setIsLoading(false);
+      // setIsLoading(true);
       const response = await fetch(
         `https://panorama-server-i79k.onrender.com/api/v1/reAssign/${getLaptopId}`,
         {
@@ -129,8 +142,6 @@ function App() {
       setGetLaptopId(null);
     } catch (error) {
       console.error(error);
-    } finally {
-      setIsLoading(false);
     }
   }
 
@@ -188,7 +199,7 @@ function App() {
     >
       <BrowserRouter>
         <Routes>
-          <Route index element={<DashBoard />} />
+          <Route index element={<Landing />} />
           <Route path="/login" element={<Login />} />
           {/* <Route path="/appointment" element={<Appointment />} /> */}
           <Route>

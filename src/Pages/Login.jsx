@@ -25,7 +25,7 @@ export default function Login() {
     try {
       setLoginLoading(true);
       const res = await fetch(
-        "https://panorama-server-i79k.onrender.com/api/v1/login",
+        "https://pgsql-invoice.onrender.com/login",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
