@@ -1,16 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { jsPDF } from "jspdf";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import DashboardPdf from "../Components/DashboardPdf";
 
 const GeneratePDF = () => {
   const location = useLocation();
+  const navigate = useNavigate(); 
+
   const invoice = location.state?.invoice || {};
   console.log("🧾 Received invoice data:", invoice);
 
   const [pdfUrl, setPdfUrl] = useState("");
   const [isPdfPreviewVisible, setIsPdfPreviewVisible] = useState(false);
+
+  // ✅ Function to navigate back
+  const handleBackToList = () => {
+    navigate("/genpdf/create-invoice");
+  };
 
   // ✅ Static Invoice Data
   const commonDataForPdf = {
@@ -19,16 +26,16 @@ const GeneratePDF = () => {
       ? new Date(invoice.issue_date).toLocaleDateString()
       : "N/A",
     companyName: invoice?.company_name || "N/A",
-    companyAccountNumber: invoice?.company_bank_account_number|| "N/A",
-    companyIfscCode: invoice?.company_ifsc_code|| "N/A",
-    companyState: invoice?.company_state|| "N/A",
-    companyGst: invoice?.company_gst_number|| "N/A",
-    companyPan: invoice?.company_pan|| "N/A",
-    clientName:invoice?.client_name||"N/A",
-    clientAddress: invoice?.client_address||"N/A",
+    companyAccountNumber: invoice?.company_bank_account_number || "N/A",
+    companyIfscCode: invoice?.company_ifsc_code || "N/A",
+    companyState: invoice?.company_state || "N/A",
+    companyGst: invoice?.company_gst_number || "N/A",
+    companyPan: invoice?.company_pan || "N/A",
+    clientName: invoice?.client_name || "N/A",
+    clientAddress: invoice?.client_address || "N/A",
     add2: "Gurgaon, Haryana - 122001",
-    clientState: invoice?.client_state||"N/A",
-    clientGst: invoice?.client_gst_number||"N/A",
+    clientState: invoice?.client_state || "N/A",
+    clientGst: invoice?.client_gst_number || "N/A",
     gstRate: 18,
     currencyType: "INR",
   };
@@ -36,17 +43,17 @@ const GeneratePDF = () => {
   const resourcesArr = [
     {
       userId: "123",
-      employeeName: invoice?.employee_name||"Project Name",
-      workingOn: invoice?.project_name||"Project Name",
-      sacCode: "9983", //hard code
+      employeeName: invoice?.employee_name || "Project Name",
+      workingOn: invoice?.project_name || "Project Name",
+      sacCode: "9983",
       fromDate: "1st November 2025",
       toDate: "30th November 2025",
-      days: invoice?.days||"days not found",
+      days: invoice?.days || "days not found",
       hours: 8,
       payPerDay: 3000,
     },
   ];
-// todo
+
   const calculateTotals = (gstRate) => {
     const subTotal = resourcesArr.reduce(
       (acc, val) => acc + val.payPerDay * val.days,
@@ -69,7 +76,7 @@ const GeneratePDF = () => {
 
     // Header
     doc.setFontSize(15);
-    doc.text(commonDataForPdf.companyName, 30, 32); //panorama name
+    doc.text(commonDataForPdf.companyName, 30, 32);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(61, 121, 216);
     doc.text(`INVOICE NO: ${commonDataForPdf.invoiceNo}`, 112, 32);
@@ -90,7 +97,7 @@ const GeneratePDF = () => {
     doc.text("Bank Details:", 32, 60.5);
     doc.setFont("helvetica", "normal");
     doc.text(`Name -${commonDataForPdf.companyName}`, 32, 65);
-    doc.text(`Account No - ${commonDataForPdf.companyAccountNumber}` , 32, 69);
+    doc.text(`Account No - ${commonDataForPdf.companyAccountNumber}`, 32, 69);
     doc.text(`IFSC Code - ${commonDataForPdf.companyIfscCode}`, 32, 73);
 
     // Company Info
@@ -154,7 +161,7 @@ const GeneratePDF = () => {
       doc.text(`(${res.fromDate} - ${res.toDate})`, 31.5, currentY + 3.3);
       doc.setFont("helvetica", "bold");
       doc.text(
-        `${res.days} Days * ${res.hours} Hours * ${res.payPerDay} ${commonDataForPdf.currencyType}`, //Total amount
+        `${res.days} Days * ${res.hours} Hours * ${res.payPerDay} ${commonDataForPdf.currencyType}`,
         31.5,
         currentY + 6.7
       );
@@ -202,43 +209,47 @@ const GeneratePDF = () => {
 
   return (
     <div className="mx-auto">
-      {/* <DashboardPdf /> */}
-      {/* <div className="max-w-7xl mx-auto"> */}
-        <div className="flex flex-col mt-3 rounded-2xl w-full h-screen sm:px-5 lg:px-20">
-          <div className="mt-5">
-            <button
-              onClick={() => generatePDF()}
-              className="py-2 px-6 mx-24 rounded-md bg-pano-blue text-white shadow-lg hover:bg-blue-600 transition-colors"
-            >
-              Generate PDF Preview
-            </button>
-          </div>
-
-          {isPdfPreviewVisible ? (
-            <div className="bg-gray-50 shadow-lg flex flex-col mt-5 rounded-2xl w-full h-screen sm:px-5">
-              <div className="relative h-10 w-full mb-5">
-                <button
-                  onClick={() => generatePDF("active")}
-                  className="absolute top-0 right-8 w-28 p-2 text-sm rounded-lg bg-slate-600 text-white"
-                >
-                  Download PDF
-                </button>
-              </div>
-              <iframe
-                src={pdfUrl}
-                style={{ width: "100%", height: "800px" }}
-                frameBorder="0"
-                title="PDF Preview"
-              />
-            </div>
-          ) : (
-            <div className="mx-24 mt-5 text-gray-600">
-              Click “Generate PDF Preview” to view sample invoice
-            </div>
-          )}
+      <div className="flex flex-col mt-3 rounded-2xl w-full h-screen sm:px-5 lg:px-20">
+        <div className="mt-5">
+          <button
+            onClick={() => generatePDF()}
+            className="py-2 px-6 mx-24 rounded-md bg-pano-blue text-white shadow-lg hover:bg-blue-600 transition-colors"
+          >
+            Generate PDF Preview
+          </button>
         </div>
+
+        {isPdfPreviewVisible ? (
+          <div className="bg-gray-50 shadow-lg flex flex-col mt-5 rounded-2xl w-full h-screen sm:px-5">
+            <div className="relative h-10 w-full mb-5">
+              <button
+                onClick={() => generatePDF("active")}
+                className="absolute top-0 right-8 w-28 p-2 text-sm rounded-lg bg-slate-600 text-white"
+              >
+                Download PDF
+              </button>
+              <button
+                onClick={handleBackToList} 
+                className="absolute top-0 w-28 p-2 text-sm rounded-lg bg-gray-500 text-white"
+              >
+                Back to List
+              </button>
+            </div>
+
+            <iframe
+              src={pdfUrl}
+              style={{ width: "100%", height: "800px" }}
+              frameBorder="0"
+              title="PDF Preview"
+            />
+          </div>
+        ) : (
+          <div className="mx-24 mt-5 text-gray-600">
+            Click “Generate PDF Preview” to view sample invoice
+          </div>
+        )}
       </div>
-    // </div>
+    </div>
   );
 };
 
