@@ -194,15 +194,15 @@ const EmployeeOnboarding = () => {
   )
 
   const columnDefs = [
-    {
-      field: "SNo",
-      maxWidth: 80,
-      valueGetter: "node.rowIndex + 1",
-      filter: true,
-      floatingFilter: true,
-      sortable: true,
-      resizable: true,
-    },
+    // {
+    //   field: "SNo",
+    //   maxWidth: 80,
+    //   valueGetter: "node.rowIndex + 1",
+    //   filter: true,
+    //   floatingFilter: true,
+    //   sortable: true,
+    //   resizable: true,
+    // },
     {
       field: "name",
       headerName: "Name",
@@ -490,8 +490,8 @@ const EmployeeOnboarding = () => {
         {!showForm && !showPreview && (
           <>
             {/* AG Grid Table */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="border-b border-slate-200 px-6 py-4">
+            <div className="bg-white rounded-lg overflow-hidden">
+              <div className="py-4">
                 <h3 className="text-lg font-semibold text-slate-900">
                   Employees <span className="text-slate-500 font-normal">({filteredEmployees.length})</span>
                 </h3>

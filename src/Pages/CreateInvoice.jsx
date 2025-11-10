@@ -1,10 +1,15 @@
-import { useState, useEffect } from "react";
-import DashboardPdf from "../Components/DashboardPdf";
-import GeneratePDF from "./GeneratePDF";
-import { useNavigate } from "react-router-dom"; 
+"use client"
 
-// const API_URL = "http://localhost:3000/api/invoices";
-const API_URL = "https://pgsql-invoice.onrender.com/api/invoices";
+import { useState, useEffect, useRef } from "react"
+import { Plus, AlertCircle, CheckCircle } from "lucide-react"
+import { AgGridReact } from "ag-grid-react"
+import "ag-grid-community/styles/ag-grid.css"
+import "ag-grid-community/styles/ag-theme-quartz.css"
+import DashboardPdf from "../Components/DashboardPdf"
+import GeneratePDF from "./GeneratePDF"
+import LoaderOverlay from "./LoaderOverlay"
+
+const API_URL = "https://pgsql-invoice.onrender.com/api/invoices"
 
 const emptyForm = {
   invoice_no: "",
@@ -15,56 +20,117 @@ const emptyForm = {
   paid_leaves: "",
   unpaid_leaves: "",
   over_time: "",
-};
+}
+
+const ActionCellRenderer = ({ data, onEdit, onDelete, onGeneratePdf }) => (
+  <div className="flex gap-2 justify-end h-full items-center">
+    <button
+      onClick={() => onEdit(data)}
+      className="inline-flex items-center gap-1 px-3 py-1 text-blue-600 hover:bg-blue-50 rounded transition-colors font-medium text-sm"
+    >
+      Edit
+    </button>
+    <button
+      onClick={() => onDelete(data.id)}
+      className="inline-flex items-center gap-1 px-3 py-1 text-red-600 hover:bg-red-50 rounded transition-colors font-medium text-sm"
+    >
+      Delete
+    </button>
+    <button
+      onClick={() => onGeneratePdf(data.id)}
+      className="inline-flex items-center gap-1 px-3 py-1 text-green-600 hover:bg-green-50 rounded transition-colors font-medium text-sm"
+    >
+      PDF
+    </button>
+  </div>
+)
 
 const CreateInvoice = () => {
-  const [invoices, setInvoices] = useState([]);
-  const [formData, setFormData] = useState(emptyForm);
-  const [editingId, setEditingId] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
-  const [showSample, setShowSample] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [deleteId, setDeleteId] = useState(null);
-  const navigate = useNavigate();
+  const [invoices, setInvoices] = useState([])
+  const [formData, setFormData] = useState(emptyForm)
+  const [editingId, setEditingId] = useState(null)
+  const [showForm, setShowForm] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+  const [showSample, setShowSample] = useState(false)
+  const [pdfInvoiceData, setPdfInvoiceData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+  const [validationErrors, setValidationErrors] = useState({})
+  const gridApiRef = useRef(null)
+  const [deleteId, setDeleteId] = useState(null)
+
   useEffect(() => {
-    fetchInvoices();
-  }, []);
+    if (error || success) {
+      const timer = setTimeout(() => {
+        setError("")
+        setSuccess("")
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [error, success])
+
+  const onGridReady = (params) => {
+    gridApiRef.current = params.api
+    params.api.sizeColumnsToFit()
+    window.addEventListener("resize", () => {
+      setTimeout(() => {
+        params.api.sizeColumnsToFit()
+      })
+    })
+  }
+
+  useEffect(() => {
+    fetchInvoices()
+  }, [])
 
   async function fetchInvoices() {
-    setLoading(true);
-    setError("");
+    setLoading(true)
+    setError("")
     try {
-      const res = await fetch(API_URL);
-      if (!res.ok) throw new Error("Failed to fetch invoices");
-      const data = await res.json();
-      const rows = Array.isArray(data) ? data : [];
-      setInvoices(rows);
+      const res = await fetch(API_URL)
+      if (!res.ok) throw new Error("Failed to fetch invoices")
+      const data = await res.json()
+      const rows = Array.isArray(data) ? data : []
+      setInvoices(rows)
     } catch (err) {
-      setError(err.message);
+      setError(err instanceof Error ? err.message : "Failed to fetch invoices")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
+  const validateForm = () => {
+    const errors = {}
+
+    if (!formData.invoice_no.trim()) errors.invoice_no = "Invoice number is required"
+    if (!formData.project_id.trim()) errors.project_id = "Project ID is required"
+    if (!formData.total_amount.trim()) errors.total_amount = "Total amount is required"
+
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const resetAllViews = () => {
-    setShowForm(false);
-    setShowPreview(false);
-    setShowSample(false);
-  };
+    setShowForm(false)
+    setShowPreview(false)
+    setShowSample(false)
+    setPdfInvoiceData(null)
+    setDeleteId(null)
+  }
 
   const handleOpenForm = () => {
-    setFormData(emptyForm);
-    setEditingId(null);
-    resetAllViews();
-    setShowForm(true);
-  };
+    setFormData(emptyForm)
+    setEditingId(null)
+    resetAllViews()
+    setShowForm(true)
+    setValidationErrors({})
+  }
 
-  const handleShowSample = () => {
-    resetAllViews();
-    setShowSample(true);
-  };
+  // const handleShowSample = () => {
+  //   resetAllViews()
+  //   setShowSample(true)
+  // }
 
   const handleEdit = (invoice) => {
     setFormData({
@@ -76,31 +142,36 @@ const CreateInvoice = () => {
       paid_leaves: invoice.paid_leaves?.toString?.() || "",
       unpaid_leaves: invoice.unpaid_leaves?.toString?.() || "",
       over_time: invoice.over_time?.toString?.() || "",
-    });
-    setEditingId(invoice.id);
-    resetAllViews();
-    setShowForm(true);
-  };
+    })
+    setEditingId(invoice.id)
+    resetAllViews()
+    setShowForm(true)
+    setValidationErrors({})
+  }
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+    if (validationErrors[name]) {
+      setValidationErrors({ ...validationErrors, [name]: "" })
+    }
+  }
 
   const handleFormSubmit = (e) => {
-    e.preventDefault();
-    resetAllViews();
-    setShowPreview(true);
-  };
+    e.preventDefault()
+    if (!validateForm()) return
+    resetAllViews()
+    setShowPreview(true)
+  }
 
   const handleEditPreview = () => {
-    resetAllViews();
-    setShowForm(true);
-  };
+    resetAllViews()
+    setShowForm(true)
+  }
 
   const handleFinalSubmit = async () => {
-    setLoading(true);
-    setError("");
+    setLoading(true)
+    setError("")
     try {
       const payload = {
         invoice_no: formData.invoice_no,
@@ -111,373 +182,501 @@ const CreateInvoice = () => {
         paid_leaves: Number(formData.paid_leaves || 0),
         unpaid_leaves: Number(formData.unpaid_leaves || 0),
         over_time: Number(formData.over_time || 0),
-      };
+      }
 
-      let res;
+      let res
       if (editingId) {
         res = await fetch(`${API_URL}/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        });
+        })
       } else {
         res = await fetch(API_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        });
+        })
       }
 
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Operation failed");
+        const text = await res.text()
+        throw new Error(text || "Operation failed")
       }
 
-      await fetchInvoices();
-      resetAllViews();
-      setFormData(emptyForm);
-      setEditingId(null);
+      await fetchInvoices()
+      resetAllViews()
+      setFormData(emptyForm)
+      setEditingId(null)
+      setSuccess(editingId ? "Invoice updated successfully!" : "Invoice created successfully!")
     } catch (err) {
-      setError(err.message);
+      setError(err instanceof Error ? err.message : "Failed to save invoice")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const handleDelete = (id) => setDeleteId(id);
+  const handleDelete = (id) => setDeleteId(id)
 
   const confirmDelete = async () => {
-    if (!deleteId) return;
-    setLoading(true);
-    setError("");
+    if (!deleteId) return
+    setLoading(true)
+    setError("")
     try {
-      const res = await fetch(`${API_URL}/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`${API_URL}/${deleteId}`, { method: "DELETE" })
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Delete failed");
+        const text = await res.text()
+        throw new Error(text || "Delete failed")
       }
-      await fetchInvoices();
-      setDeleteId(null);
+      await fetchInvoices()
+      setDeleteId(null)
+      setSuccess("Invoice deleted successfully!")
     } catch (err) {
-      setError(err.message);
+      setError(err instanceof Error ? err.message : "Failed to delete invoice")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleGeneratePdf = async (id) => {
-    setLoading(true);
-    setError("");
+    setLoading(true)
+    setError("")
     try {
-      const res = await fetch(`${API_URL}/${id}`);
-      if (!res.ok) throw new Error("Failed to fetch invoice details");
-      const invoiceData = await res.json();
-      console.log("🧾 Fetched invoice:", invoiceData);
-      navigate("/genpdf", { state: { invoice: invoiceData } }); // ✅ navigate with data
+      const res = await fetch(`${API_URL}/${id}`)
+      if (!res.ok) throw new Error("Failed to fetch invoice details")
+      const invoiceData = await res.json()
+      resetAllViews()
+      setPdfInvoiceData(invoiceData)
+      setShowSample(true)
     } catch (err) {
-      setError(err.message);
+      setError(err instanceof Error ? err.message : "Failed to generate PDF")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
+
+  const columnDefs = [
+    // {
+    //   field: "SNo",
+    //   maxWidth: 80,
+    //   valueGetter: "node.rowIndex + 1",
+    //   filter: true,
+    //   floatingFilter: true,
+    //   sortable: true,
+    //   resizable: true,
+    // },
+    {
+      field: "invoice_no",
+      headerName: "Invoice No",
+      minWidth: 130,
+      filter: true,
+      floatingFilter: true,
+      sortable: true,
+      resizable: true,
+    },
+    {
+      field: "project_id",
+      headerName: "Project ID",
+      minWidth: 120,
+      filter: true,
+      floatingFilter: true,
+      sortable: true,
+      resizable: true,
+    },
+    {
+      field: "issue_date",
+      headerName: "Issue Date",
+      minWidth: 130,
+      filter: true,
+      floatingFilter: true,
+      sortable: true,
+      resizable: true,
+    },
+    {
+      field: "total_amount",
+      headerName: "Total Amount",
+      minWidth: 130,
+      filter: true,
+      floatingFilter: true,
+      sortable: true,
+      resizable: true,
+    },
+    {
+      field: "days",
+      headerName: "Days",
+      minWidth: 100,
+      filter: true,
+      floatingFilter: true,
+      sortable: true,
+      resizable: true,
+    },
+    {
+      field: "paid_leaves",
+      headerName: "Paid Leaves",
+      minWidth: 120,
+      filter: true,
+      floatingFilter: true,
+      sortable: true,
+      resizable: true,
+    },
+    {
+      field: "unpaid_leaves",
+      headerName: "Unpaid Leaves",
+      minWidth: 130,
+      filter: true,
+      floatingFilter: true,
+      sortable: true,
+      resizable: true,
+    },
+    {
+      field: "over_time",
+      headerName: "Overtime",
+      minWidth: 120,
+      filter: true,
+      floatingFilter: true,
+      sortable: true,
+      resizable: true,
+    },
+    {
+      field: "Actions",
+      headerName: "Actions",
+      minWidth: 220,
+      cellRenderer: (params) => (
+        <ActionCellRenderer
+          data={params.data}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onGeneratePdf={handleGeneratePdf}
+        />
+      ),
+      sortable: false,
+      filter: false,
+      resizable: true,
+    },
+  ]
 
   return (
-    <div className="mx-auto">
+    <div className="min-h-screen font-sans">
+      <LoaderOverlay isLoading={loading} message="Processing..." />
+
       <DashboardPdf />
-      <div className="max-w-5xl mx-auto mt-8 bg-white rounded-lg shadow-lg p-6">
-        <h1 className="text-2xl font-bold mb-6 text-center text-blue-800">
-          Invoice Management
-        </h1>
+      <div className="max-w-7xl mx-auto p-4 md:p-8">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-slate-900 mb-2">Invoice Management</h1>
+          <p className="text-slate-600">Create, manage, and generate invoices</p>
+        </div>
 
         {error && (
-          <div className="text-red-600 mb-3 whitespace-pre-wrap">{error}</div>
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-red-800">{error}</p>
+          </div>
         )}
-        {loading && <div className="text-blue-600 mb-3">Loading...</div>}
+
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
+            <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+            <p className="text-green-800">{success}</p>
+          </div>
+        )}
 
         {!showForm && !showPreview && !showSample && (
-          <div className="flex justify-end gap-4 mb-6">
+          <div className="flex justify-end gap-3 mb-6">
             <button
               onClick={handleOpenForm}
-              className="px-4 py-2 bg-blue-700 hover:bg-blue-900 text-white font-semibold rounded-md shadow"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md transition-colors"
             >
+              <Plus className="h-5 w-5" />
               Add Invoice
             </button>
-            <button
+            {/* <button
               onClick={handleShowSample}
-              className="px-4 py-2 bg-blue-700 hover:bg-blue-900 text-white font-semibold rounded-md shadow"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg shadow-md transition-colors"
             >
               Sample Invoice
-            </button>
-          </div>
-        )}
-
-        {!showForm && !showPreview && !showSample && (
-          <div className="overflow-x-auto pb-8">
-            <table className="min-w-full border text-center">
-              <thead>
-                <tr className="bg-blue-100">
-                  <th className="p-2 border">ID</th>
-                  <th className="p-2 border">Invoice No</th>
-                  <th className="p-2 border">Project ID</th>
-                  <th className="p-2 border">Issue Date</th>
-                  <th className="p-2 border">Total Amount</th>
-                  <th className="p-2 border">Days</th>
-                  <th className="p-2 border">Paid Leaves</th>
-                  <th className="p-2 border">Unpaid Leaves</th>
-                  <th className="p-2 border">Overtime</th>
-                  <th className="p-2 border">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="p-3">
-                      No invoices found.
-                    </td>
-                  </tr>
-                ) : (
-                  invoices.map((inv) => (
-                    <tr key={inv.id}>
-                      <td className="border p-1">{inv.id}</td>
-                      <td className="border p-1">{inv.invoice_no}</td>
-                      <td className="border p-1">{inv.project_id}</td>
-                      <td className="border p-1">
-                        {inv.issue_date?.slice(0, 10)}
-                      </td>
-                      <td className="border p-1">{inv.total_amount}</td>
-                      <td className="border p-1">{inv.days}</td>
-                      <td className="border p-1">{inv.paid_leaves}</td>
-                      <td className="border p-1">{inv.unpaid_leaves}</td>
-                      <td className="border p-1">{inv.over_time}</td>
-                      <td className="border p-1">
-                        <button
-                          className="mr-2 px-2 py-1 text-blue-700 hover:underline"
-                          onClick={() => handleEdit(inv)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="mr-2 px-2 py-1 text-red-600 hover:underline"
-                          onClick={() => handleDelete(inv.id)}
-                        >
-                          Delete
-                        </button>
-                        <button
-                          className="px-2 py-1 text-green-700 hover:underline"
-                          onClick={() => handleGeneratePdf(inv.id)}
-                        >
-                          Generate PDF
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {deleteId && (
-          <div className="mb-6 bg-yellow-50 p-4 rounded flex flex-col gap-2 border border-yellow-200">
-            <span>Are you sure you want to delete invoice ID {deleteId}?</span>
-            <div className="flex gap-2 justify-end">
-              <button
-                className="px-3 py-1 bg-gray-500 text-white rounded"
-                onClick={() => setDeleteId(null)}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-3 py-1 bg-red-700 text-white rounded"
-                onClick={confirmDelete}
-              >
-                Delete
-              </button>
-            </div>
+            </button> */}
           </div>
         )}
 
         {showForm && (
-          <form onSubmit={handleFormSubmit} className="space-y-4">
-            <div>
-              <label className="block font-medium text-gray-700">
-                Invoice No
-              </label>
-              <input
-                type="text"
-                name="invoice_no"
-                value={formData.invoice_no}
-                onChange={handleChange}
-                required
-                className="mt-1 block w-full border border-gray-300 rounded-md p-2"
-              />
+          <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="border-b border-slate-200 px-6 py-4">
+              <h2 className="text-2xl font-bold text-slate-900">{editingId ? "Edit Invoice" : "Add New Invoice"}</h2>
+              <p className="text-slate-600 text-sm mt-1">
+                {editingId ? "Update invoice information" : "Fill in the details to create a new invoice"}
+              </p>
             </div>
+            <div className="p-6">
+              <form onSubmit={handleFormSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">
+                      Invoice No <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="invoice_no"
+                      value={formData.invoice_no}
+                      onChange={handleChange}
+                      placeholder="Enter invoice number"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                        validationErrors.invoice_no ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                      }`}
+                    />
+                    {validationErrors.invoice_no && (
+                      <p className="text-red-600 text-sm mt-1">{validationErrors.invoice_no}</p>
+                    )}
+                  </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block font-medium text-gray-700">
-                  Project ID
-                </label>
-                <input
-                  type="number"
-                  name="project_id"
-                  value={formData.project_id}
-                  onChange={handleChange}
-                  required
-                  className="mt-1 block w-full border border-gray-300 rounded-md p-2"
-                />
-              </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">
+                      Project ID <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      name="project_id"
+                      value={formData.project_id}
+                      onChange={handleChange}
+                      placeholder="Enter project ID"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                        validationErrors.project_id ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                      }`}
+                    />
+                    {validationErrors.project_id && (
+                      <p className="text-red-600 text-sm mt-1">{validationErrors.project_id}</p>
+                    )}
+                  </div>
 
-              <div>
-                <label className="block font-medium text-gray-700">
-                  Issue Date
-                </label>
-                <input
-                  type="date"
-                  name="issue_date"
-                  value={formData.issue_date}
-                  onChange={handleChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md p-2"
-                />
-              </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">Issue Date</label>
+                    <input
+                      type="date"
+                      name="issue_date"
+                      value={formData.issue_date}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">
+                      Total Amount <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      name="total_amount"
+                      value={formData.total_amount}
+                      onChange={handleChange}
+                      placeholder="Enter total amount"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                        validationErrors.total_amount ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                      }`}
+                    />
+                    {validationErrors.total_amount && (
+                      <p className="text-red-600 text-sm mt-1">{validationErrors.total_amount}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">Days</label>
+                    <input
+                      type="number"
+                      name="days"
+                      value={formData.days}
+                      onChange={handleChange}
+                      placeholder="Days"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">Paid Leaves</label>
+                    <input
+                      type="number"
+                      name="paid_leaves"
+                      value={formData.paid_leaves}
+                      onChange={handleChange}
+                      placeholder="Paid leaves"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">Unpaid Leaves</label>
+                    <input
+                      type="number"
+                      name="unpaid_leaves"
+                      value={formData.unpaid_leaves}
+                      onChange={handleChange}
+                      placeholder="Unpaid leaves"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">Overtime</label>
+                    <input
+                      type="number"
+                      name="over_time"
+                      value={formData.over_time}
+                      onChange={handleChange}
+                      placeholder="Overtime"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForm(false)
+                      setFormData(emptyForm)
+                      setEditingId(null)
+                      setValidationErrors({})
+                    }}
+                    className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-colors"
+                  >
+                    {loading ? "Loading..." : "Preview"}
+                  </button>
+                </div>
+              </form>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block font-medium text-gray-700">
-                  Total Amount
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  name="total_amount"
-                  value={formData.total_amount}
-                  onChange={handleChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md p-2"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium text-gray-700">Days</label>
-                <input
-                  type="number"
-                  name="days"
-                  value={formData.days}
-                  onChange={handleChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md p-2"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block font-medium text-gray-700">
-                  Paid Leaves
-                </label>
-                <input
-                  type="number"
-                  name="paid_leaves"
-                  value={formData.paid_leaves}
-                  onChange={handleChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md p-2"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium text-gray-700">
-                  Unpaid Leaves
-                </label>
-                <input
-                  type="number"
-                  name="unpaid_leaves"
-                  value={formData.unpaid_leaves}
-                  onChange={handleChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md p-2"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium text-gray-700">
-                  Overtime
-                </label>
-                <input
-                  type="number"
-                  name="over_time"
-                  value={formData.over_time}
-                  onChange={handleChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md p-2"
-                />
-              </div>
-            </div>
-
-            <div className="pt-2 flex justify-end gap-2">
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-700 hover:bg-blue-900 text-white font-semibold rounded-md shadow"
-              >
-                Preview
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  resetAllViews();
-                  setFormData(emptyForm);
-                  setEditingId(null);
-                }}
-                className="px-4 py-2 bg-gray-500 hover:bg-gray-700 text-white font-semibold rounded-md shadow"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+          </div>
         )}
 
         {showPreview && (
-          <div className="bg-gray-50 border p-4 rounded">
-            <h2 className="font-bold text-lg mb-3 text-blue-700">Preview</h2>
-            <dl className="mb-4 grid grid-cols-2 gap-y-2">
-              {Object.entries(formData).map(([key, val]) => (
-                <div key={key} className="contents">
-                  <dt className="font-semibold capitalize">
-                    {key.replace("_", " ")}:
-                  </dt>
-                  <dd>{val || "—"}</dd>
+          <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden border border-blue-200">
+            <div className="border-b border-slate-200 px-6 py-4 bg-blue-50">
+              <h2 className="text-2xl font-bold text-slate-900">Preview & Confirm</h2>
+              <p className="text-sm text-slate-600 mt-1">Review the information before submitting</p>
+            </div>
+            <div className="p-6">
+              <div className="bg-slate-50 rounded-lg p-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {Object.entries(formData).map(([key, val]) => (
+                    <div key={key}>
+                      <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
+                        {key.replace("_", " ")}
+                      </p>
+                      <p className="text-lg font-semibold text-slate-900">{val || "—"}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </dl>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={handleEditPreview}
-                className="px-4 py-2 bg-yellow-600 hover:bg-yellow-800 text-white font-semibold rounded-md shadow"
-              >
-                Edit
-              </button>
-              <button
-                onClick={handleFinalSubmit}
-                className="px-4 py-2 bg-green-700 hover:bg-green-900 text-white font-semibold rounded-md shadow"
-              >
-                Submit
-              </button>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
+                <button
+                  onClick={handleEditPreview}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={handleFinalSubmit}
+                  disabled={loading}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors"
+                >
+                  {loading ? "Submitting..." : "Submit"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {deleteId && (
+          <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden border border-red-200">
+            <div className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-slate-900">Delete Invoice?</p>
+                  <p className="text-sm text-slate-600 mt-1">This action cannot be undone.</p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setDeleteId(null)}
+                    className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDelete}
+                    disabled={loading}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium rounded-lg transition-colors"
+                  >
+                    {loading ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {showSample && (
           <div className="mt-4">
-            <GeneratePDF />
+            <GeneratePDF invoiceData={pdfInvoiceData} />
             <div className="flex justify-center mt-4">
               <button
                 onClick={() => resetAllViews()}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-800 text-white font-semibold rounded-md shadow"
+                className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-semibold rounded-lg shadow-md transition-colors"
               >
                 Back to List
               </button>
             </div>
           </div>
         )}
+
+        {!showForm && !showPreview && !showSample && (
+          <>
+            <div className="bg-white rounded-lg overflow-hidden">
+              <div className="py-4">
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Invoices <span className="text-slate-500 font-normal">({invoices.length})</span>
+                </h3>
+                <p className="text-sm text-slate-600 mt-1">
+                  {loading
+                    ? "Loading invoices..."
+                    : `Managing ${invoices.length} invoice${invoices.length !== 1 ? "s" : ""}`}
+                </p>
+              </div>
+              <div className="ag-theme-quartz" style={{ height: "500px", width: "100%" }}>
+                <AgGridReact
+                  rowData={invoices}
+                  columnDefs={columnDefs}
+                  pagination={true}
+                  paginationPageSize={10}
+                  rowSelection="single"
+                  animateRows={true}
+                  onGridReady={onGridReady}
+                  ref={gridApiRef}
+                  defaultColDef={{
+                    resizable: true,
+                    sortable: true,
+                    filter: true,
+                  }}
+                  overlayNoRowsTemplate={
+                    invoices.length === 0
+                      ? "<span>No invoices yet. Create your first invoice to get started!</span>"
+                      : ""
+                  }
+                />
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default CreateInvoice;
+export default CreateInvoice
