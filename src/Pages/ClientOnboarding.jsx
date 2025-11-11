@@ -80,7 +80,7 @@ const ClientOnboarding = () => {
     if (!formData.address.trim()) errors.address = "Address is required"
     if (!formData.state.trim()) errors.state = "State is required"
     if (!formData.company_name.trim()) errors.company_name = "Company Name is required"
-    if (!formData.gst_number) errors.gst_number = "Invalid GST Number format"
+    if (!formData.gst_number.trim()) errors.gst_number = "GST Number is required"
     setValidationErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -182,7 +182,14 @@ const ClientOnboarding = () => {
 
   const columnDefs = [
     { field: "name", headerName: "Name", minWidth: 150, filter: true, floatingFilter: true, sortable: true },
-    { field: "company_name", headerName: "Company Name", minWidth: 130, filter: true, floatingFilter: true, sortable: true },
+    {
+      field: "company_name",
+      headerName: "Company Name",
+      minWidth: 130,
+      filter: true,
+      floatingFilter: true,
+      sortable: true,
+    },
     { field: "address", headerName: "Address", minWidth: 180, filter: true, floatingFilter: true, sortable: true },
     { field: "state", headerName: "State", minWidth: 120, filter: true, floatingFilter: true, sortable: true },
     { field: "gst_number", headerName: "GST", minWidth: 150, filter: true, floatingFilter: true, sortable: true },
@@ -223,6 +230,192 @@ const ClientOnboarding = () => {
           </div>
         )}
 
+        {showForm && (
+          <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="border-b border-slate-200 px-6 py-4">
+              <h2 className="text-2xl font-bold text-slate-900">{editingId ? "Edit Client" : "Add New Client"}</h2>
+              <p className="text-slate-600 text-sm mt-1">
+                {editingId ? "Update client information" : "Fill in the details to add a new client"}
+              </p>
+            </div>
+            <div className="p-6">
+              <form onSubmit={handleFormSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Client Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">
+                      Client Name <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      placeholder="Enter client name"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                        validationErrors.name ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                      }`}
+                    />
+                    {validationErrors.name && <p className="text-red-600 text-sm mt-1">{validationErrors.name}</p>}
+                  </div>
+
+                  {/* Company Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">
+                      Company Name <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="company_name"
+                      value={formData.company_name}
+                      onChange={handleChange}
+                      placeholder="Enter company name"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                        validationErrors.company_name ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                      }`}
+                    />
+                    {validationErrors.company_name && (
+                      <p className="text-red-600 text-sm mt-1">{validationErrors.company_name}</p>
+                    )}
+                  </div>
+
+                  {/* Address */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">
+                      Address <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="address"
+                      value={formData.address}
+                      onChange={handleChange}
+                      placeholder="Enter address"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                        validationErrors.address ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                      }`}
+                    />
+                    {validationErrors.address && (
+                      <p className="text-red-600 text-sm mt-1">{validationErrors.address}</p>
+                    )}
+                  </div>
+
+                  {/* State */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">
+                      State <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="state"
+                      value={formData.state}
+                      onChange={handleChange}
+                      placeholder="Enter state"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                        validationErrors.state ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                      }`}
+                    />
+                    {validationErrors.state && <p className="text-red-600 text-sm mt-1">{validationErrors.state}</p>}
+                  </div>
+
+                  {/* GST Number */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-slate-900 mb-2">
+                      GST Number <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="gst_number"
+                      value={formData.gst_number}
+                      onChange={handleChange}
+                      placeholder="Enter GST Number"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                        validationErrors.gst_number ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                      }`}
+                    />
+                    {validationErrors.gst_number && (
+                      <p className="text-red-600 text-sm mt-1">{validationErrors.gst_number}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Form Actions */}
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForm(false)
+                      setFormData(emptyForm)
+                      setEditingId(null)
+                      setValidationErrors({})
+                    }}
+                    className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-colors"
+                  >
+                    {loading ? "Loading..." : "Preview"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {showPreview && (
+          <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden border border-blue-200">
+            <div className="border-b border-slate-200 px-6 py-4 bg-blue-50">
+              <h2 className="text-2xl font-bold text-slate-900">Preview & Confirm</h2>
+              <p className="text-slate-600 text-sm mt-1">Review the information before submitting</p>
+            </div>
+            <div className="p-6">
+              <div className="bg-slate-50 rounded-lg p-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Client Name</p>
+                    <p className="text-lg font-semibold text-slate-900">{formData.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Company Name</p>
+                    <p className="text-lg font-semibold text-slate-900">{formData.company_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Address</p>
+                    <p className="text-lg font-semibold text-slate-900">{formData.address}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">State</p>
+                    <p className="text-lg font-semibold text-slate-900">{formData.state}</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">GST Number</p>
+                    <p className="text-lg font-semibold font-mono text-slate-900">{formData.gst_number}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
+                <button
+                  onClick={handleEditPreview}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={handleFinalSubmit}
+                  disabled={loading}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors"
+                >
+                  {loading ? "Submitting..." : "Submit"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Delete Confirmation Modal */}
         {deleteId && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
@@ -255,6 +448,11 @@ const ClientOnboarding = () => {
               <h3 className="text-lg font-semibold text-slate-900">
                 Clients <span className="text-slate-500 font-normal">({filteredClients.length})</span>
               </h3>
+              <p className="text-sm text-slate-600 mt-1">
+                {loading
+                  ? "Loading clients..."
+                  : `Managing ${filteredClients.length} client${filteredClients.length !== 1 ? "s" : ""}`}
+              </p>
             </div>
             <div className="ag-theme-quartz" style={{ height: "500px", width: "100%" }}>
               <AgGridReact
@@ -266,6 +464,18 @@ const ClientOnboarding = () => {
                 animateRows={true}
                 onGridReady={onGridReady}
                 ref={gridApiRef}
+                defaultColDef={{
+                  resizable: true,
+                  sortable: true,
+                  filter: true,
+                }}
+                overlayNoRowsTemplate={
+                  filteredClients.length === 0
+                    ? clients.length === 0
+                      ? "<span>No clients yet. Add your first client to get started!</span>"
+                      : "<span>No clients match your search.</span>"
+                    : ""
+                }
               />
             </div>
           </div>

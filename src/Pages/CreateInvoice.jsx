@@ -1,13 +1,12 @@
-"use client"
-
 import { useState, useEffect, useRef } from "react"
-import { Plus, AlertCircle, CheckCircle } from "lucide-react"
+import { Plus } from "lucide-react"
 import { AgGridReact } from "ag-grid-react"
 import "ag-grid-community/styles/ag-grid.css"
 import "ag-grid-community/styles/ag-theme-quartz.css"
 import DashboardPdf from "../Components/DashboardPdf"
 import GeneratePDF from "./GeneratePDF"
 import LoaderOverlay from "./LoaderOverlay"
+import toast, { Toaster } from "react-hot-toast"
 
 const API_URL = "https://pgsql-invoice.onrender.com/api/invoices"
 
@@ -54,21 +53,9 @@ const CreateInvoice = () => {
   const [showSample, setShowSample] = useState(false)
   const [pdfInvoiceData, setPdfInvoiceData] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
   const [validationErrors, setValidationErrors] = useState({})
   const gridApiRef = useRef(null)
   const [deleteId, setDeleteId] = useState(null)
-
-  useEffect(() => {
-    if (error || success) {
-      const timer = setTimeout(() => {
-        setError("")
-        setSuccess("")
-      }, 5000)
-      return () => clearTimeout(timer)
-    }
-  }, [error, success])
 
   const onGridReady = (params) => {
     gridApiRef.current = params.api
@@ -86,7 +73,6 @@ const CreateInvoice = () => {
 
   async function fetchInvoices() {
     setLoading(true)
-    setError("")
     try {
       const res = await fetch(API_URL)
       if (!res.ok) throw new Error("Failed to fetch invoices")
@@ -94,7 +80,7 @@ const CreateInvoice = () => {
       const rows = Array.isArray(data) ? data : []
       setInvoices(rows)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch invoices")
+      toast.error(err instanceof Error ? err.message : "Failed to fetch invoices")
     } finally {
       setLoading(false)
     }
@@ -126,11 +112,6 @@ const CreateInvoice = () => {
     setShowForm(true)
     setValidationErrors({})
   }
-
-  // const handleShowSample = () => {
-  //   resetAllViews()
-  //   setShowSample(true)
-  // }
 
   const handleEdit = (invoice) => {
     setFormData({
@@ -171,7 +152,6 @@ const CreateInvoice = () => {
 
   const handleFinalSubmit = async () => {
     setLoading(true)
-    setError("")
     try {
       const payload = {
         invoice_no: formData.invoice_no,
@@ -208,9 +188,9 @@ const CreateInvoice = () => {
       resetAllViews()
       setFormData(emptyForm)
       setEditingId(null)
-      setSuccess(editingId ? "Invoice updated successfully!" : "Invoice created successfully!")
+      toast.success(editingId ? "Invoice updated successfully!" : "Invoice created successfully!")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save invoice")
+      toast.error(err instanceof Error ? err.message : "Failed to save invoice")
     } finally {
       setLoading(false)
     }
@@ -221,7 +201,6 @@ const CreateInvoice = () => {
   const confirmDelete = async () => {
     if (!deleteId) return
     setLoading(true)
-    setError("")
     try {
       const res = await fetch(`${API_URL}/${deleteId}`, { method: "DELETE" })
       if (!res.ok) {
@@ -230,9 +209,9 @@ const CreateInvoice = () => {
       }
       await fetchInvoices()
       setDeleteId(null)
-      setSuccess("Invoice deleted successfully!")
+      toast.success("Invoice deleted successfully!")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete invoice")
+      toast.error(err instanceof Error ? err.message : "Failed to delete invoice")
     } finally {
       setLoading(false)
     }
@@ -240,7 +219,6 @@ const CreateInvoice = () => {
 
   const handleGeneratePdf = async (id) => {
     setLoading(true)
-    setError("")
     try {
       const res = await fetch(`${API_URL}/${id}`)
       if (!res.ok) throw new Error("Failed to fetch invoice details")
@@ -249,22 +227,13 @@ const CreateInvoice = () => {
       setPdfInvoiceData(invoiceData)
       setShowSample(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate PDF")
+      toast.error(err instanceof Error ? err.message : "Failed to generate PDF")
     } finally {
       setLoading(false)
     }
   }
 
   const columnDefs = [
-    // {
-    //   field: "SNo",
-    //   maxWidth: 80,
-    //   valueGetter: "node.rowIndex + 1",
-    //   filter: true,
-    //   floatingFilter: true,
-    //   sortable: true,
-    //   resizable: true,
-    // },
     {
       field: "invoice_no",
       headerName: "Invoice No",
@@ -357,6 +326,7 @@ const CreateInvoice = () => {
 
   return (
     <div className="min-h-screen font-sans">
+      <Toaster position="top-right" reverseOrder={false} />
       <LoaderOverlay isLoading={loading} message="Processing..." />
 
       <DashboardPdf />
@@ -365,20 +335,6 @@ const CreateInvoice = () => {
           <h1 className="text-4xl font-bold text-slate-900 mb-2">Invoice Management</h1>
           <p className="text-slate-600">Create, manage, and generate invoices</p>
         </div>
-
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-red-800">{error}</p>
-          </div>
-        )}
-
-        {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
-            <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-            <p className="text-green-800">{success}</p>
-          </div>
-        )}
 
         {!showForm && !showPreview && !showSample && (
           <div className="flex justify-end gap-3 mb-6">
@@ -389,12 +345,6 @@ const CreateInvoice = () => {
               <Plus className="h-5 w-5" />
               Add Invoice
             </button>
-            {/* <button
-              onClick={handleShowSample}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg shadow-md transition-colors"
-            >
-              Sample Invoice
-            </button> */}
           </div>
         )}
 
@@ -595,28 +545,24 @@ const CreateInvoice = () => {
         )}
 
         {deleteId && (
-          <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden border border-red-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-slate-900">Delete Invoice?</p>
-                  <p className="text-sm text-slate-600 mt-1">This action cannot be undone.</p>
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setDeleteId(null)}
-                    className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmDelete}
-                    disabled={loading}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium rounded-lg transition-colors"
-                  >
-                    {loading ? "Deleting..." : "Delete"}
-                  </button>
-                </div>
+          <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+              <h2 className="text-lg font-semibold text-slate-900 mb-2">Delete Invoice?</h2>
+              <p className="text-sm text-slate-600 mb-6">This action cannot be undone.</p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setDeleteId(null)}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={loading}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium rounded-lg transition-colors"
+                >
+                  {loading ? "Deleting..." : "Delete"}
+                </button>
               </div>
             </div>
           </div>

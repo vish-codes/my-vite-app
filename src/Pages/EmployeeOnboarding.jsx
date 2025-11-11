@@ -1,12 +1,11 @@
-"use client"
-
 import { useState, useEffect, useRef } from "react"
-import { Plus, AlertCircle, CheckCircle } from "lucide-react"
+import { Plus } from "lucide-react"
 import { AgGridReact } from "ag-grid-react"
 import "ag-grid-community/styles/ag-grid.css"
 import "ag-grid-community/styles/ag-theme-quartz.css"
 import DashboardPdf from "../Components/DashboardPdf"
 import LoaderOverlay from "./LoaderOverlay"
+import toast, { Toaster } from "react-hot-toast"
 
 const API_URL = "https://pgsql-invoice.onrender.com/api/employee"
 
@@ -41,8 +40,6 @@ const EmployeeOnboarding = () => {
   const [showForm, setShowForm] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
   const [deleteId, setDeleteId] = useState(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [validationErrors, setValidationErrors] = useState({})
@@ -51,16 +48,6 @@ const EmployeeOnboarding = () => {
   useEffect(() => {
     fetchEmployees()
   }, [])
-
-  useEffect(() => {
-    if (error || success) {
-      const timer = setTimeout(() => {
-        setError("")
-        setSuccess("")
-      }, 5000)
-      return () => clearTimeout(timer)
-    }
-  }, [error, success])
 
   const onGridReady = (params) => {
     gridApiRef.current = params.api
@@ -74,14 +61,13 @@ const EmployeeOnboarding = () => {
 
   const fetchEmployees = async () => {
     setLoading(true)
-    setError("")
     try {
       const res = await fetch(API_URL)
       if (!res.ok) throw new Error("Failed to fetch employees")
       const data = await res.json()
       setEmployees(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch employees")
+      toast.error(err instanceof Error ? err.message : "Failed to fetch employees")
     } finally {
       setLoading(false)
     }
@@ -141,7 +127,6 @@ const EmployeeOnboarding = () => {
 
   const handleFinalSubmit = async () => {
     setLoading(true)
-    setError("")
     try {
       const method = editingId ? "PUT" : "POST"
       const url = editingId ? `${API_URL}/${editingId}` : API_URL
@@ -159,9 +144,9 @@ const EmployeeOnboarding = () => {
       setShowForm(false)
       setEditingId(null)
       setFormData(emptyForm)
-      setSuccess(editingId ? "Employee updated successfully!" : "Employee added successfully!")
+      toast.success(editingId ? "Employee updated successfully!" : "Employee added successfully!")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save employee")
+      toast.error(err instanceof Error ? err.message : "Failed to save employee")
     } finally {
       setLoading(false)
     }
@@ -172,16 +157,15 @@ const EmployeeOnboarding = () => {
   const confirmDelete = async () => {
     if (!deleteId) return
     setLoading(true)
-    setError("")
     try {
       const res = await fetch(`${API_URL}/${deleteId}`, { method: "DELETE" })
       if (!res.ok) throw new Error("Failed to delete employee")
       await fetchEmployees()
-      setDeleteId(null)
-      setSuccess("Employee deleted successfully!")
+      toast.success("Employee deleted successfully!")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete employee")
+      toast.error(err instanceof Error ? err.message : "Failed to delete employee")
     } finally {
+      setDeleteId(null)
       setLoading(false)
     }
   }
@@ -194,15 +178,6 @@ const EmployeeOnboarding = () => {
   )
 
   const columnDefs = [
-    // {
-    //   field: "SNo",
-    //   maxWidth: 80,
-    //   valueGetter: "node.rowIndex + 1",
-    //   filter: true,
-    //   floatingFilter: true,
-    //   sortable: true,
-    //   resizable: true,
-    // },
     {
       field: "name",
       headerName: "Name",
@@ -254,6 +229,7 @@ const EmployeeOnboarding = () => {
 
   return (
     <div className="min-h-screen font-sans">
+      <Toaster position="top-right" reverseOrder={false} />
       <LoaderOverlay isLoading={loading} message="Processing..." />
 
       <DashboardPdf />
@@ -263,20 +239,6 @@ const EmployeeOnboarding = () => {
           <h1 className="text-4xl font-bold text-slate-900 mb-2">Employee Management</h1>
           <p className="text-slate-600">Manage and onboard your employees efficiently</p>
         </div>
-
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-red-800">{error}</p>
-          </div>
-        )}
-
-        {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
-            <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-            <p className="text-green-800">{success}</p>
-          </div>
-        )}
 
         {/* Add Button */}
         {!showForm && !showPreview && (
@@ -459,28 +421,24 @@ const EmployeeOnboarding = () => {
 
         {/* Delete Confirmation */}
         {deleteId && (
-          <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden border border-red-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-slate-900">Delete Employee?</p>
-                  <p className="text-sm text-slate-600 mt-1">This action cannot be undone.</p>
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setDeleteId(null)}
-                    className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmDelete}
-                    disabled={loading}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium rounded-lg transition-colors"
-                  >
-                    {loading ? "Deleting..." : "Delete"}
-                  </button>
-                </div>
+          <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+              <h2 className="text-lg font-semibold text-slate-900 mb-2">Delete Employee?</h2>
+              <p className="text-sm text-slate-600 mb-6">This action cannot be undone.</p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setDeleteId(null)}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={loading}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium rounded-lg transition-colors"
+                >
+                  {loading ? "Deleting..." : "Delete"}
+                </button>
               </div>
             </div>
           </div>
