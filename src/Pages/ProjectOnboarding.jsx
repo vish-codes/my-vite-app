@@ -328,6 +328,337 @@ const ProjectOnboarding = () => {
           </div>
         )}
 
+        {/* Form View */}
+        {showForm && (
+          <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="border-b border-slate-200 px-6 py-4">
+              <h2 className="text-2xl font-bold text-slate-900">
+                {editingProjectId ? "Edit Project" : "Add New Project"}
+              </h2>
+              <p className="text-slate-600 text-sm mt-1">
+                {editingProjectId
+                  ? "Update project information"
+                  : "Fill in the details to add a new project"}
+              </p>
+            </div>
+            <div className="p-6">
+              <form onSubmit={handleFormSubmit} className="space-y-6">
+                {/* Project Name */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-900 mb-2">
+                    Project Name <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    placeholder="Enter project name"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                      validationErrors.name
+                        ? "border-red-500 bg-red-50"
+                        : "border-slate-300 bg-white"
+                    }`}
+                  />
+                  {validationErrors.name && (
+                    <p className="text-red-600 text-sm mt-1">
+                      {validationErrors.name}
+                    </p>
+                  )}
+                </div>
+
+                {/* Client and Employee */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">
+                      Client <span className="text-red-600">*</span>
+                    </label>
+                    <select
+                      name="client_id"
+                      value={formData.client_id}
+                      onChange={handleChange}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                        validationErrors.client_id
+                          ? "border-red-500 bg-red-50"
+                          : "border-slate-300 bg-white"
+                      }`}
+                    >
+                      <option value="">Select Client</option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {client.name}
+                        </option>
+                      ))}
+                    </select>
+                    {validationErrors.client_id && (
+                      <p className="text-red-600 text-sm mt-1">
+                        {validationErrors.client_id}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">
+                      Employee <span className="text-red-600">*</span>
+                    </label>
+                    <select
+                      name="emp_id"
+                      value={formData.emp_id}
+                      onChange={handleChange}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                        validationErrors.emp_id
+                          ? "border-red-500 bg-red-50"
+                          : "border-slate-300 bg-white"
+                      }`}
+                    >
+                      <option value="">Select Employee</option>
+                      {employees.map((emp) => (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.name}
+                        </option>
+                      ))}
+                    </select>
+                    {validationErrors.emp_id && (
+                      <p className="text-red-600 text-sm mt-1">
+                        {validationErrors.emp_id}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Billing Amounts */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">
+                      Base Amount <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      name="billing_amt"
+                      value={formData.billing_amt}
+                      onChange={handleChange}
+                      placeholder="Enter billing amount"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                        validationErrors.billing_amt
+                          ? "border-red-500 bg-red-50"
+                          : "border-slate-300 bg-white"
+                      }`}
+                    />
+                    {validationErrors.billing_amt && (
+                      <p className="text-red-600 text-sm mt-1">
+                        {validationErrors.billing_amt}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">
+                      Overtime Amount{" "}
+                      <span className="text-slate-500 text-xs">(Optional)</span>
+                    </label>
+                    <input
+                      type="number"
+                      name="overtime_amt"
+                      value={formData.overtime_amt}
+                      onChange={handleChange}
+                      placeholder="Enter overtime amount"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Billing Method */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-900 mb-2">
+                    Billing Method
+                  </label>
+                  <select
+                    name="billing_method"
+                    value={formData.billing_method}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition bg-white"
+                  >
+                    <option value="days">Days</option>
+                    <option value="hours">Hours</option>
+                    <option value="month">Month</option>
+                  </select>
+                </div>
+
+                {/* Active Checkbox */}
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    name="active"
+                    checked={formData.active}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-blue-600 rounded"
+                  />
+                  <label className="text-sm font-medium text-slate-900">
+                    Active Project
+                  </label>
+                </div>
+
+                {/* Form Actions */}
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForm(false);
+                      setFormData(emptyForm);
+                      setEditingProjectId(null);
+                      setValidationErrors({});
+                    }}
+                    className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-colors"
+                  >
+                    {loading ? "Loading..." : "Preview"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Preview */}
+        {showPreview && (
+          <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden border border-blue-200">
+            <div className="border-b border-slate-200 px-6 py-4 bg-blue-50">
+              <h2 className="text-2xl font-bold text-slate-900">
+                Preview & Confirm
+              </h2>
+              <p className="text-slate-600 text-sm mt-1">
+                Review the information before submitting
+              </p>
+            </div>
+            <div className="p-6">
+              <div className="bg-slate-50 rounded-lg p-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
+                      Project Name
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {formData.name}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
+                      Client
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {clients.find((c) => c.id === Number(formData.client_id))
+                        ?.name || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
+                      Employee
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {employees.find((e) => e.id === Number(formData.emp_id))
+                        ?.name || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
+                      Base Amount
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {formData.billing_amt}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
+                      Overtime Amount
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {formData.overtime_amt || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
+                      Billing Method
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900 capitalize">
+                      {formData.billing_method}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
+                      Status
+                    </p>
+                    <p
+                      className={`text-lg font-semibold ${
+                        formData.active ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      {formData.active ? "Active" : "Inactive"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
+                <button
+                  onClick={handleEditPreview}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={handleFinalSubmit}
+                  disabled={loading}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors"
+                >
+                  {loading
+                    ? "Submitting..."
+                    : editingProjectId
+                    ? "Update"
+                    : "Submit"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation */}
+        {deleteId && (
+          <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden border border-red-200">
+            <div className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-slate-900">
+                    Delete Project?
+                  </p>
+                  <p className="text-sm text-slate-600 mt-1">
+                    This action cannot be undone.
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setDeleteId(null)}
+                    className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDelete}
+                    disabled={loading}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium rounded-lg transition-colors"
+                  >
+                    {loading ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* AG Grid Table */}
         {!showForm && !showPreview && (
           <div className="bg-white rounded-lg overflow-hidden">
