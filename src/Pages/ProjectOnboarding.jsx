@@ -1,15 +1,15 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from "react"
-import { Plus } from "lucide-react"
-import { AgGridReact } from "ag-grid-react"
-import "ag-grid-community/styles/ag-grid.css"
-import "ag-grid-community/styles/ag-theme-quartz.css"
-import DashboardPdf from "../Components/DashboardPdf"
-import LoaderOverlay from "./LoaderOverlay"
-import toast, { Toaster } from "react-hot-toast"
+import { useState, useEffect, useRef } from "react";
+import { Plus } from "lucide-react";
+import { AgGridReact } from "ag-grid-react";
+import "ag-grid-community/styles/ag-grid.css";
+import "ag-grid-community/styles/ag-theme-quartz.css";
+import DashboardPdf from "../Components/DashboardPdf";
+import LoaderOverlay from "./LoaderOverlay";
+import toast, { Toaster } from "react-hot-toast";
 
-const PROJECT_URI = "https://pgsql-invoice.onrender.com"
+const PROJECT_URI = "https://pgsql-invoice.onrender.com";
 
 const emptyForm = {
   name: "",
@@ -19,7 +19,7 @@ const emptyForm = {
   billing_method: "days",
   overtime_amt: "",
   active: true,
-}
+};
 
 const ActionCellRenderer = ({ data, onEdit, onDelete }) => (
   <div className="flex gap-2 justify-end h-full items-center">
@@ -36,113 +36,113 @@ const ActionCellRenderer = ({ data, onEdit, onDelete }) => (
       Delete
     </button>
   </div>
-)
+);
 
 const ProjectOnboarding = () => {
-  const [formData, setFormData] = useState(emptyForm)
-  const [clients, setClients] = useState([])
-  const [employees, setEmployees] = useState([])
-  const [projects, setProjects] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [showForm, setShowForm] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
-  const [editingProjectId, setEditingProjectId] = useState(null)
-  const [deleteId, setDeleteId] = useState(null)
-  const [validationErrors, setValidationErrors] = useState({})
-  const gridApiRef = useRef(null)
+  const [formData, setFormData] = useState(emptyForm);
+  const [clients, setClients] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState(null);
+  const [deleteId, setDeleteId] = useState(null);
+  const [validationErrors, setValidationErrors] = useState({});
+  const gridApiRef = useRef(null);
 
   useEffect(() => {
-    fetchClients()
-    fetchEmployees()
-    fetchProjects()
-  }, [])
+    fetchClients();
+    fetchEmployees();
+    fetchProjects();
+  }, []);
 
   const onGridReady = (params) => {
-    gridApiRef.current = params.api
-    params.api.sizeColumnsToFit()
+    gridApiRef.current = params.api;
+    params.api.sizeColumnsToFit();
     window.addEventListener("resize", () => {
-      setTimeout(() => params.api.sizeColumnsToFit())
-    })
-  }
+      setTimeout(() => params.api.sizeColumnsToFit());
+    });
+  };
 
   const fetchClients = async () => {
     try {
-      const res = await fetch(`${PROJECT_URI}/api/clients`)
-      if (!res.ok) throw new Error("Failed to fetch clients")
-      const data = await res.json()
-      setClients(data)
+      const res = await fetch(`${PROJECT_URI}/api/clients`);
+      if (!res.ok) throw new Error("Failed to fetch clients");
+      const data = await res.json();
+      setClients(data);
     } catch (err) {
-      toast.error(err.message || "Error fetching clients")
+      toast.error(err.message || "Error fetching clients");
     }
-  }
+  };
 
   const fetchEmployees = async () => {
     try {
-      const res = await fetch(`${PROJECT_URI}/api/employee`)
-      if (!res.ok) throw new Error("Failed to fetch employees")
-      const data = await res.json()
-      setEmployees(data)
+      const res = await fetch(`${PROJECT_URI}/api/employee`);
+      if (!res.ok) throw new Error("Failed to fetch employees");
+      const data = await res.json();
+      setEmployees(data);
     } catch (err) {
-      toast.error(err.message || "Error fetching employees")
+      toast.error(err.message || "Error fetching employees");
     }
-  }
+  };
 
   const fetchProjects = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const res = await fetch(`${PROJECT_URI}/api/projects`)
-      if (!res.ok) throw new Error("Failed to fetch projects")
-      const data = await res.json()
-      setProjects(data)
+      const res = await fetch(`${PROJECT_URI}/api/projects`);
+      if (!res.ok) throw new Error("Failed to fetch projects");
+      const data = await res.json();
+      setProjects(data);
     } catch (err) {
-      toast.error(err.message || "Error fetching projects")
+      toast.error(err.message || "Error fetching projects");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const validateForm = () => {
-    const errors = {}
-    if (!formData.name.trim()) errors.name = "Project name is required"
-    if (!formData.client_id) errors.client_id = "Please select a client"
-    if (!formData.emp_id) errors.emp_id = "Please select an employee"
+    const errors = {};
+    if (!formData.name.trim()) errors.name = "Project name is required";
+    if (!formData.client_id) errors.client_id = "Please select a client";
+    if (!formData.emp_id) errors.emp_id = "Please select an employee";
     if (!formData.billing_amt || Number(formData.billing_amt) <= 0)
-      errors.billing_amt = "Billing amount must be greater than 0"
+      errors.billing_amt = "Billing amount must be greater than 0";
 
-    setValidationErrors(errors)
-    return Object.keys(errors).length === 0
-  }
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target
-    setFormData({ ...formData, [name]: type === "checkbox" ? checked : value })
+    const { name, value, type, checked } = e.target;
+    setFormData({ ...formData, [name]: type === "checkbox" ? checked : value });
     if (validationErrors[name]) {
-      setValidationErrors({ ...validationErrors, [name]: "" })
+      setValidationErrors({ ...validationErrors, [name]: "" });
     }
-  }
+  };
 
   const handleOpenForm = () => {
-    setEditingProjectId(null)
-    setFormData(emptyForm)
-    setShowForm(true)
-    setShowPreview(false)
-    setValidationErrors({})
-  }
+    setEditingProjectId(null);
+    setFormData(emptyForm);
+    setShowForm(true);
+    setShowPreview(false);
+    setValidationErrors({});
+  };
 
   const handleFormSubmit = (e) => {
-    e.preventDefault()
-    if (!validateForm()) return
-    setShowPreview(true)
-    setShowForm(false)
-  }
+    e.preventDefault();
+    if (!validateForm()) return;
+    setShowPreview(true);
+    setShowForm(false);
+  };
 
   const handleEditPreview = () => {
-    setShowPreview(false)
-    setShowForm(true)
-  }
+    setShowPreview(false);
+    setShowForm(true);
+  };
 
   const handleEditProject = (project) => {
-    setEditingProjectId(project.id)
+    setEditingProjectId(project.id);
     setFormData({
       name: project.name,
       client_id: String(project.client_id),
@@ -151,34 +151,34 @@ const ProjectOnboarding = () => {
       billing_method: project.billing_method,
       overtime_amt: String(project.overtime_amt || ""),
       active: project.active,
-    })
-    setShowForm(true)
-    setShowPreview(false)
-    setValidationErrors({})
-  }
+    });
+    setShowForm(true);
+    setShowPreview(false);
+    setValidationErrors({});
+  };
 
-  const handleDelete = (id) => setDeleteId(id)
+  const handleDelete = (id) => setDeleteId(id);
 
   const confirmDelete = async () => {
-    if (!deleteId) return
-    setLoading(true)
+    if (!deleteId) return;
+    setLoading(true);
     try {
       const res = await fetch(`${PROJECT_URI}/api/projects/${deleteId}`, {
         method: "DELETE",
-      })
-      if (!res.ok) throw new Error("Failed to delete project")
-      await fetchProjects()
-      setDeleteId(null)
-      toast.success("Project deleted successfully!")
+      });
+      if (!res.ok) throw new Error("Failed to delete project");
+      await fetchProjects();
+      setDeleteId(null);
+      toast.success("Project deleted successfully!");
     } catch (err) {
-      toast.error(err.message || "Failed to delete project")
+      toast.error(err.message || "Failed to delete project");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleFinalSubmit = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
       const payload = {
         name: formData.name,
@@ -188,35 +188,39 @@ const ProjectOnboarding = () => {
         billing_method: formData.billing_method,
         overtime_amt: formData.overtime_amt ? Number(formData.overtime_amt) : 0,
         active: formData.active,
-      }
+      };
 
-      const method = editingProjectId ? "PUT" : "POST"
+      const method = editingProjectId ? "PUT" : "POST";
       const url = editingProjectId
         ? `${PROJECT_URI}/api/projects/${editingProjectId}`
-        : `${PROJECT_URI}/api/projects`
+        : `${PROJECT_URI}/api/projects`;
 
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      })
+      });
 
-      if (!response.ok) throw new Error("Failed to save project")
+      if (!response.ok) throw new Error("Failed to save project");
 
-      await fetchProjects()
-      setShowPreview(false)
-      setShowForm(false)
-      setEditingProjectId(null)
-      setFormData(emptyForm)
-      toast.success(editingProjectId ? "Project updated successfully!" : "Project created successfully!")
+      await fetchProjects();
+      setShowPreview(false);
+      setShowForm(false);
+      setEditingProjectId(null);
+      setFormData(emptyForm);
+      toast.success(
+        editingProjectId
+          ? "Project updated successfully!"
+          : "Project created successfully!"
+      );
     } catch (err) {
-      toast.error(err.message || "Failed to save project")
+      toast.error(err.message || "Failed to save project");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const filteredProjects = projects
+  const filteredProjects = projects;
 
   const columnDefs = [
     { field: "name", headerName: "Project Name", minWidth: 150 },
@@ -261,7 +265,7 @@ const ProjectOnboarding = () => {
         />
       ),
     },
-  ]
+  ];
 
   return (
     <div className="min-h-screen font-sans">
@@ -272,8 +276,12 @@ const ProjectOnboarding = () => {
       <div className="max-w-7xl mx-auto p-4 md:p-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">Project Management</h1>
-          <p className="text-slate-600">Manage and onboard your projects efficiently</p>
+          <h1 className="text-4xl font-bold text-slate-900 mb-2">
+            Project Management
+          </h1>
+          <p className="text-slate-600">
+            Manage and onboard your projects efficiently
+          </p>
         </div>
 
         {/* Add Button */}
@@ -295,7 +303,9 @@ const ProjectOnboarding = () => {
         {deleteId && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
-              <h3 className="text-lg font-semibold text-slate-900">Delete Project?</h3>
+              <h3 className="text-lg font-semibold text-slate-900">
+                Delete Project?
+              </h3>
               <p className="text-sm text-slate-600 mt-1 mb-4">
                 This action cannot be undone.
               </p>
@@ -321,25 +331,41 @@ const ProjectOnboarding = () => {
         {/* AG Grid Table */}
         {!showForm && !showPreview && (
           <div className="bg-white rounded-lg overflow-hidden">
-            <div className="py-4">
+            <div className="py-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">
-                Projects <span className="text-slate-500 font-normal">({filteredProjects.length})</span>
+                Projects{" "}
+                <span className="text-slate-500 font-normal">
+                  ({filteredProjects?.length || 0})
+                </span>
               </h3>
             </div>
-            <div className="ag-theme-quartz" style={{ height: "500px", width: "100%" }}>
-              <AgGridReact
-                rowData={filteredProjects}
-                columnDefs={columnDefs}
-                pagination
-                paginationPageSize={10}
-                onGridReady={onGridReady}
-              />
-            </div>
+
+            {filteredProjects?.length > 0 ? (
+              <div
+                className="ag-theme-quartz"
+                style={{ height: "500px", width: "100%" }}
+              >
+                <AgGridReact
+                  rowData={filteredProjects || []}
+                  columnDefs={columnDefs}
+                  pagination
+                  paginationPageSize={10}
+                  onGridReady={onGridReady}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 text-center text-slate-500">
+                <p className="text-lg font-medium">No projects found</p>
+                <p className="text-sm text-slate-400 mt-1">
+                  Start by adding a new project.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default ProjectOnboarding
+export default ProjectOnboarding;
