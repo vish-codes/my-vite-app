@@ -14,7 +14,7 @@ const PROJECT_URI = "https://pgsql-invoice.onrender.com";
 const emptyForm = {
   name: "",
   client_id: "",
-  emp_id: "",
+  emp_id: [],
   billing_amt: "",
   billing_method: "days",
   overtime_amt: "",
@@ -49,6 +49,7 @@ const ProjectOnboarding = () => {
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
+  const [openEmployeeDropdown, setOpenEmployeeDropdown] = useState(false);
   const gridApiRef = useRef(null);
 
   useEffect(() => {
@@ -105,7 +106,8 @@ const ProjectOnboarding = () => {
     const errors = {};
     if (!formData.name.trim()) errors.name = "Project name is required";
     if (!formData.client_id) errors.client_id = "Please select a client";
-    if (!formData.emp_id) errors.emp_id = "Please select an employee";
+    if (!formData.emp_id.length)
+      errors.emp_id = "Please select at least one employee";
     if (!formData.billing_amt || Number(formData.billing_amt) <= 0)
       errors.billing_amt = "Billing amount must be greater than 0";
 
@@ -146,7 +148,7 @@ const ProjectOnboarding = () => {
     setFormData({
       name: project.name,
       client_id: String(project.client_id),
-      emp_id: String(project.emp_id),
+      emp_id: project.emp_id?.map(String) || [],
       billing_amt: String(project.billing_amt),
       billing_method: project.billing_method,
       overtime_amt: String(project.overtime_amt || ""),
@@ -183,7 +185,7 @@ const ProjectOnboarding = () => {
       const payload = {
         name: formData.name,
         client_id: Number(formData.client_id),
-        emp_id: Number(formData.emp_id),
+        emp_id: formData.emp_id.map(Number),
         billing_amt: Number(formData.billing_amt),
         billing_method: formData.billing_method,
         overtime_amt: formData.overtime_amt ? Number(formData.overtime_amt) : 0,
@@ -233,10 +235,15 @@ const ProjectOnboarding = () => {
     },
     {
       field: "emp_id",
-      headerName: "Employee",
-      minWidth: 150,
-      valueGetter: (params) =>
-        employees.find((e) => e.id === params.data.emp_id)?.name || "-",
+      headerName: "Employees",
+      minWidth: 200,
+      valueGetter: (params) => {
+        return (
+          params.data.emp_id
+            ?.map((id) => employees.find((e) => e.id === id)?.name)
+            .join(", ") || "-"
+        );
+      },
     },
     { field: "billing_amt", headerName: "Billing Amount", minWidth: 120 },
     {
@@ -266,6 +273,16 @@ const ProjectOnboarding = () => {
       ),
     },
   ];
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.target.closest(".employee-dropdown-area")) {
+        setOpenEmployeeDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   return (
     <div className="min-h-screen font-sans">
@@ -398,31 +415,94 @@ const ProjectOnboarding = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-900 mb-2">
-                      Employee <span className="text-red-600">*</span>
-                    </label>
-                    <select
-                      name="emp_id"
-                      value={formData.emp_id}
-                      onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.emp_id
-                          ? "border-red-500 bg-red-50"
-                          : "border-slate-300 bg-white"
-                      }`}
-                    >
-                      <option value="">Select Employee</option>
-                      {employees.map((emp) => (
-                        <option key={emp.id} value={emp.id}>
-                          {emp.name}
-                        </option>
-                      ))}
-                    </select>
-                    {validationErrors.emp_id && (
-                      <p className="text-red-600 text-sm mt-1">
-                        {validationErrors.emp_id}
-                      </p>
-                    )}
+                    <div className="employee-dropdown-area relative">
+                      <label className="block text-sm font-medium text-slate-900 mb-2">
+                        Employee <span className="text-red-600">*</span>
+                      </label>
+
+                      {/* Trigger Box */}
+                      <div
+                        onClick={() => setOpenEmployeeDropdown((prev) => !prev)}
+                        className={`w-full px-3 py-2 border rounded-lg bg-white cursor-pointer flex items-center justify-between ${
+                          validationErrors.emp_id
+                            ? "border-red-500 bg-red-50"
+                            : "border-slate-300"
+                        }`}
+                      >
+                        <span className="truncate">
+                          {formData.emp_id.length === 0
+                            ? "Select employees"
+                            : employees
+                                .filter((emp) =>
+                                  formData.emp_id.includes(emp.id)
+                                )
+                                .map((emp) => emp.name)
+                                .join(", ")}
+                        </span>
+
+                        <svg
+                          className={`w-4 h-4 transition-transform ${
+                            openEmployeeDropdown ? "rotate-180" : ""
+                          }`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </div>
+
+                      {/* Dropdown */}
+                      {openEmployeeDropdown && (
+                        <div className="absolute left-0 right-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-lg z-30 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150">
+                          {employees.map((emp) => (
+                            <label
+                              key={emp.id}
+                              className="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={formData.emp_id.includes(emp.id)}
+                                onChange={() => {
+                                  const updated = formData.emp_id.includes(
+                                    emp.id
+                                  )
+                                    ? formData.emp_id.filter(
+                                        (id) => id !== emp.id
+                                      )
+                                    : [...formData.emp_id, emp.id];
+
+                                  setFormData({ ...formData, emp_id: updated });
+
+                                  if (validationErrors.emp_id) {
+                                    setValidationErrors({
+                                      ...validationErrors,
+                                      emp_id: "",
+                                    });
+                                  }
+                                }}
+                                className="h-4 w-4 text-blue-600"
+                              />
+                              <span className="text-sm text-slate-800">
+                                {emp.name}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Validation Error */}
+                      {validationErrors.emp_id && (
+                        <p className="text-red-600 text-sm mt-1">
+                          {validationErrors.emp_id}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -560,8 +640,12 @@ const ProjectOnboarding = () => {
                       Employee
                     </p>
                     <p className="text-lg font-semibold text-slate-900">
-                      {employees.find((e) => e.id === Number(formData.emp_id))
-                        ?.name || "—"}
+                      {formData.emp_id
+                        .map(
+                          (id) =>
+                            employees.find((e) => e.id === Number(id))?.name
+                        )
+                        .join(", ")}
                     </p>
                   </div>
                   <div>
