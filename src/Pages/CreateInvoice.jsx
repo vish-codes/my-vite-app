@@ -8,17 +8,15 @@ import GeneratePDF from "./GeneratePDF"
 import LoaderOverlay from "./LoaderOverlay"
 import toast, { Toaster } from "react-hot-toast"
 
-const API_URL = "https://pgsql-invoice.onrender.com/api/invoices"
+const API_URL = "http://localhost:3000/api/invoices"
+const CLIENT_API_URL = "http://localhost:3000/api/clients"
+// const API_URL = "https://pgsql-invoice.onrender.com/api/invoices";
+// const CLIENT_API_URL = "https://pgsql-invoice.onrender.com/api/clients";
 
 const emptyForm = {
   invoice_no: "",
-  project_id: "",
+  client_id: "",
   issue_date: "",
-  total_amount: "",
-  days: "",
-  paid_leaves: "",
-  unpaid_leaves: "",
-  over_time: "",
 }
 
 const ActionCellRenderer = ({ data, onEdit, onDelete, onGeneratePdf }) => (
@@ -46,6 +44,7 @@ const ActionCellRenderer = ({ data, onEdit, onDelete, onGeneratePdf }) => (
 
 const CreateInvoice = () => {
   const [invoices, setInvoices] = useState([])
+  const [clients, setClients] = useState([])
   const [formData, setFormData] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
   const [showForm, setShowForm] = useState(false)
@@ -57,18 +56,33 @@ const CreateInvoice = () => {
   const gridApiRef = useRef(null)
   const [deleteId, setDeleteId] = useState(null)
 
+  // New: store projects+employees structure returned by backend for selected client
+  // projectsWithEmployees: [{ id, project_name, employees: [{ id, name }] }]
+  const [projectsWithEmployees, setProjectsWithEmployees] = useState([])
+
+  // Track checked state for projects and employees (default checked)
+  const [checkedProjects, setCheckedProjects] = useState(new Set())
+  const [checkedEmployees, setCheckedEmployees] = useState(new Set())
+
+  // Per-employee numeric inputs
+  // shape: { [employeeId]: { days: number, paid_leaves: number, unpaid_leaves: number, over_time: number } }
+  const [employeeInputs, setEmployeeInputs] = useState({})
+
+  // Rates (used for preview total calculation). Keep same values you used before.
+  const dailyRate = 1000
+  const overtimeRate = 200
+
   const onGridReady = (params) => {
     gridApiRef.current = params.api
     params.api.sizeColumnsToFit()
     window.addEventListener("resize", () => {
-      setTimeout(() => {
-        params.api.sizeColumnsToFit()
-      })
+      setTimeout(() => params.api.sizeColumnsToFit())
     })
   }
 
   useEffect(() => {
     fetchInvoices()
+    fetchClients()
   }, [])
 
   async function fetchInvoices() {
@@ -80,7 +94,89 @@ const CreateInvoice = () => {
       const rows = Array.isArray(data) ? data : []
       setInvoices(rows)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to fetch invoices")
+      toast.error(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function fetchClients() {
+    try {
+      const res = await fetch(CLIENT_API_URL)
+      if (!res.ok) throw new Error("Failed to fetch clients")
+      const data = await res.json()
+      setClients(Array.isArray(data) ? data : [])
+    } catch (err) {
+      toast.error("Error fetching clients")
+    }
+  }
+
+  // Fetch client details (projects + employees) when a client is selected
+  const fetchClientDetails = async (clientId) => {
+    if (!clientId) return
+    setLoading(true)
+    try {
+      const res = await fetch(`${CLIENT_API_URL}/${clientId}/details`)
+      if (!res.ok) throw new Error("Failed to fetch client details")
+      const data = await res.json()
+      let normalized = []
+
+      if (Array.isArray(data.projectsWithEmployees)) {
+        normalized = data.projectsWithEmployees.map((p) => ({
+          id: p.id,
+          project_name: p.project_name || p.name || p.project_name,
+          employees: Array.isArray(p.employees) ? p.employees : [],
+        }))
+      } else if (Array.isArray(data.projects)) {
+        // try to map employees_by_project if present
+        const employeesByProject = data.employees_by_project || {}
+        normalized = data.projects.map((p) => ({
+          id: p.id,
+          project_name: p.project_name || p.name,
+          employees: employeesByProject[p.id] || [],
+        }))
+      } else if (Array.isArray(data)) {
+        // if backend returns a combined flat array where each row contains project + employee, e.g.
+        // [{ project_id, project_name, employee_id, employee_name }, ...]
+        // transform into projects -> employees grouping.
+        const map = new Map()
+        data.forEach((row) => {
+          const pid = row.project_id || row.id || row.projectId
+          const pname = row.project_name || row.name || row.projectName
+          const eid = row.employee_id || row.emp_id || row.employeeId
+          const ename = row.employee_name || row.emp_name || row.employeeName
+          if (!map.has(pid)) map.set(pid, { id: pid, project_name: pname, employees: [] })
+          if (eid) map.get(pid).employees.push({ id: eid, name: ename })
+        })
+        normalized = Array.from(map.values())
+      } else {
+        // fallback: try direct fields
+        normalized = []
+      }
+
+      setProjectsWithEmployees(normalized)
+
+      // auto-check all projects and employees
+      const projSet = new Set()
+      const empSet = new Set()
+      const inputs = { ...employeeInputs } // preserve existing where possible
+
+      normalized.forEach((p) => {
+        projSet.add(p.id)
+        (p.employees || []).forEach((e) => {
+          empSet.add(e.id)
+          if (!inputs[e.id]) {
+            inputs[e.id] = { days: "", paid_leaves: "", unpaid_leaves: "", over_time: "" }
+          }
+        })
+      })
+
+      setCheckedProjects(projSet)
+      setCheckedEmployees(empSet)
+      setEmployeeInputs(inputs)
+    } catch (err) {
+      console.error(err)
+      toast.error(err instanceof Error ? err.message : "Failed to fetch client details")
     } finally {
       setLoading(false)
     }
@@ -88,11 +184,9 @@ const CreateInvoice = () => {
 
   const validateForm = () => {
     const errors = {}
-
     if (!formData.invoice_no.trim()) errors.invoice_no = "Invoice number is required"
-    if (!formData.project_id.trim()) errors.project_id = "Project ID is required"
-    if (!formData.total_amount.trim()) errors.total_amount = "Total amount is required"
-
+    if (!formData.client_id) errors.client_id = "Client is required"
+    if (!formData.issue_date) errors.issue_date = "Issue date is required"
     setValidationErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -109,6 +203,10 @@ const CreateInvoice = () => {
     setFormData(emptyForm)
     setEditingId(null)
     resetAllViews()
+    setProjectsWithEmployees([])
+    setCheckedProjects(new Set())
+    setCheckedEmployees(new Set())
+    setEmployeeInputs({})
     setShowForm(true)
     setValidationErrors({})
   }
@@ -116,18 +214,14 @@ const CreateInvoice = () => {
   const handleEdit = (invoice) => {
     setFormData({
       invoice_no: invoice.invoice_no || "",
-      project_id: invoice.project_id?.toString?.() || "",
+      client_id: invoice.client_id?.toString?.() || "",
       issue_date: invoice.issue_date ? invoice.issue_date.slice(0, 10) : "",
-      total_amount: invoice.total_amount?.toString?.() || "",
-      days: invoice.days?.toString?.() || "",
-      paid_leaves: invoice.paid_leaves?.toString?.() || "",
-      unpaid_leaves: invoice.unpaid_leaves?.toString?.() || "",
-      over_time: invoice.over_time?.toString?.() || "",
     })
     setEditingId(invoice.id)
     resetAllViews()
     setShowForm(true)
     setValidationErrors({})
+    if (invoice.client_id) fetchClientDetails(invoice.client_id)
   }
 
   const handleChange = (e) => {
@@ -135,6 +229,14 @@ const CreateInvoice = () => {
     setFormData((prev) => ({ ...prev, [name]: value }))
     if (validationErrors[name]) {
       setValidationErrors({ ...validationErrors, [name]: "" })
+    }
+    // if client dropdown changed, fetch details
+    if (name === "client_id") {
+      setProjectsWithEmployees([])
+      setCheckedProjects(new Set())
+      setCheckedEmployees(new Set())
+      setEmployeeInputs({})
+      if (value) fetchClientDetails(value)
     }
   }
 
@@ -153,44 +255,62 @@ const CreateInvoice = () => {
   const handleFinalSubmit = async () => {
     setLoading(true)
     try {
+      // prepare payload based on checked projects & employees and their inputs
+      const project_ids = Array.from(checkedProjects)
+      const employee_entries = [] // to gather employee ids (only checked)
+      // optional: include per-employee details in the payload if backend expects them
+      Object.keys(employeeInputs).forEach((eid) => {
+        const idNum = Number(eid)
+        if (checkedEmployees.has(idNum)) {
+          const vals = employeeInputs[eid] || {}
+          employee_entries.push({
+            employee_id: idNum,
+            days: Number(vals.days || 0),
+            paid_leaves: Number(vals.paid_leaves || 0),
+            unpaid_leaves: Number(vals.unpaid_leaves || 0),
+            over_time: Number(vals.over_time || 0),
+          })
+        }
+      })
+
+      // totalAmount calculated same as preview (sum employee wise using rates)
+      let total_amount = 0
+      employee_entries.forEach((entry) => {
+        const payableDays = Math.max(0, Number(entry.days || 0) - Number(entry.unpaid_leaves || 0))
+        total_amount += payableDays * dailyRate + Number(entry.over_time || 0) * overtimeRate
+      })
+
       const payload = {
         invoice_no: formData.invoice_no,
-        project_id: Number(formData.project_id),
+        client_id: Number(formData.client_id),
         issue_date: formData.issue_date || new Date(),
-        total_amount: Number(formData.total_amount || 0),
-        days: Number(formData.days || 0),
-        paid_leaves: Number(formData.paid_leaves || 0),
-        unpaid_leaves: Number(formData.unpaid_leaves || 0),
-        over_time: Number(formData.over_time || 0),
+        project_ids,
+        employees: employee_entries, // structured employee entries (id + values)
+        total_amount,
       }
 
-      let res
-      if (editingId) {
-        res = await fetch(`${API_URL}/${editingId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-      } else {
-        res = await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-      }
+      const res = await fetch(editingId ? `${API_URL}/${editingId}` : API_URL, {
+        method: editingId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
 
       if (!res.ok) {
         const text = await res.text()
-        throw new Error(text || "Operation failed")
+        throw new Error(text || "Failed to save invoice")
       }
 
       await fetchInvoices()
       resetAllViews()
       setFormData(emptyForm)
       setEditingId(null)
+      setProjectsWithEmployees([])
+      setCheckedProjects(new Set())
+      setCheckedEmployees(new Set())
+      setEmployeeInputs({})
       toast.success(editingId ? "Invoice updated successfully!" : "Invoice created successfully!")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save invoice")
+      toast.error(err instanceof Error ? err.message : "Failed to create invoice")
     } finally {
       setLoading(false)
     }
@@ -203,10 +323,7 @@ const CreateInvoice = () => {
     setLoading(true)
     try {
       const res = await fetch(`${API_URL}/${deleteId}`, { method: "DELETE" })
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || "Delete failed")
-      }
+      if (!res.ok) throw new Error("Failed to delete invoice")
       await fetchInvoices()
       setDeleteId(null)
       toast.success("Invoice deleted successfully!")
@@ -233,95 +350,119 @@ const CreateInvoice = () => {
     }
   }
 
+  // toggle project checked
+  const toggleProject = (projectId) => {
+    const next = new Set(checkedProjects)
+    if (next.has(projectId)) {
+      next.delete(projectId)
+      // when project unchecked, also uncheck its employees
+      const proj = projectsWithEmployees.find((p) => p.id === projectId)
+      if (proj?.employees) {
+        const nextEmp = new Set(checkedEmployees)
+        proj.employees.forEach((e) => nextEmp.delete(e.id))
+        setCheckedEmployees(nextEmp)
+      }
+    } else {
+      next.add(projectId)
+      // when project checked, auto check its employees
+      const proj = projectsWithEmployees.find((p) => p.id === projectId)
+      if (proj?.employees) {
+        const nextEmp = new Set(checkedEmployees)
+        proj.employees.forEach((e) => nextEmp.add(e.id))
+        setCheckedEmployees(nextEmp)
+      }
+    }
+    setCheckedProjects(next)
+  }
+
+  // toggle employee checked
+  const toggleEmployee = (employeeId) => {
+    const next = new Set(checkedEmployees)
+    if (next.has(employeeId)) next.delete(employeeId)
+    else next.add(employeeId)
+    setCheckedEmployees(next)
+  }
+
+  // handle per-employee numeric input change
+  const handleEmployeeInputChange = (employeeId, field, value) => {
+    setEmployeeInputs((prev) => ({
+      ...prev,
+      [employeeId]: {
+        ...((prev && prev[employeeId]) || { days: "", paid_leaves: "", unpaid_leaves: "", over_time: "" }),
+        [field]: value,
+      },
+    }))
+  }
+
+  // compute total amount for preview
+  const computePreviewTotal = () => {
+    let total = 0
+    Object.keys(employeeInputs).forEach((eid) => {
+      const idNum = Number(eid)
+      if (!checkedEmployees.has(idNum)) return
+      const vals = employeeInputs[eid] || {}
+      const days = Number(vals.days || 0)
+      const unpaid = Number(vals.unpaid_leaves || 0)
+      const overtime = Number(vals.over_time || 0)
+      const payableDays = Math.max(0, days - unpaid)
+      total += payableDays * dailyRate + overtime * overtimeRate
+    })
+    return total
+  }
+
   const columnDefs = [
-    {
-      field: "invoice_no",
-      headerName: "Invoice No",
-      minWidth: 130,
-      filter: true,
-      floatingFilter: true,
-      sortable: true,
-      resizable: true,
-    },
-    {
-      field: "project_id",
-      headerName: "Project ID",
-      minWidth: 120,
-      filter: true,
-      floatingFilter: true,
-      sortable: true,
-      resizable: true,
-    },
-    {
-      field: "issue_date",
-      headerName: "Issue Date",
-      minWidth: 130,
-      filter: true,
-      floatingFilter: true,
-      sortable: true,
-      resizable: true,
-    },
-    {
-      field: "total_amount",
-      headerName: "Total Amount",
-      minWidth: 130,
-      filter: true,
-      floatingFilter: true,
-      sortable: true,
-      resizable: true,
-    },
-    {
-      field: "days",
-      headerName: "Days",
-      minWidth: 100,
-      filter: true,
-      floatingFilter: true,
-      sortable: true,
-      resizable: true,
-    },
-    {
-      field: "paid_leaves",
-      headerName: "Paid Leaves",
-      minWidth: 120,
-      filter: true,
-      floatingFilter: true,
-      sortable: true,
-      resizable: true,
-    },
-    {
-      field: "unpaid_leaves",
-      headerName: "Unpaid Leaves",
-      minWidth: 130,
-      filter: true,
-      floatingFilter: true,
-      sortable: true,
-      resizable: true,
-    },
-    {
-      field: "over_time",
-      headerName: "Overtime",
-      minWidth: 120,
-      filter: true,
-      floatingFilter: true,
-      sortable: true,
-      resizable: true,
-    },
-    {
-      field: "Actions",
-      headerName: "Actions",
-      minWidth: 220,
-      cellRenderer: (params) => (
-        <ActionCellRenderer
-          data={params.data}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onGeneratePdf={handleGeneratePdf}
-        />
-      ),
-      sortable: false,
-      filter: false,
-      resizable: true,
-    },
+  {
+    field: "invoice_no",
+    headerName: "Invoice No",
+    minWidth: 130,
+    filter: true,
+    floatingFilter: true,
+    sortable: true,
+    resizable: true,
+  },
+  {
+    field: "client_name",
+    headerName: "Client Name",
+    minWidth: 150,
+    filter: true,
+    floatingFilter: true,
+    sortable: true,
+    resizable: true,
+  },
+  {
+    field: "issue_date",
+    headerName: "Issue Date",
+    minWidth: 130,
+    filter: true,
+    floatingFilter: true,
+    sortable: true,
+    resizable: true,
+  },
+  {
+    field: "total_amount",
+    headerName: "Total Amount",
+    minWidth: 130,
+    filter: true,
+    floatingFilter: true,
+    sortable: true,
+    resizable: true,
+  },
+  {
+    field: "Actions",
+    headerName: "Actions",
+    minWidth: 220,
+    cellRenderer: (params) => (
+      <ActionCellRenderer
+        data={params.data}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onGeneratePdf={handleGeneratePdf}
+      />
+    ),
+    sortable: false,
+    filter: false,
+    resizable: true,
+  },
   ]
 
   return (
@@ -358,6 +499,7 @@ const CreateInvoice = () => {
             </div>
             <div className="p-6">
               <form onSubmit={handleFormSubmit} className="space-y-6">
+                {/* Invoice No and Client */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-slate-900 mb-2">
@@ -380,23 +522,31 @@ const CreateInvoice = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-slate-900 mb-2">
-                      Project ID <span className="text-red-600">*</span>
+                      Select Client <span className="text-red-600">*</span>
                     </label>
-                    <input
-                      type="number"
-                      name="project_id"
-                      value={formData.project_id}
+                    <select
+                      name="client_id"
+                      value={formData.client_id}
                       onChange={handleChange}
-                      placeholder="Enter project ID"
                       className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.project_id ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                        validationErrors.client_id ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
                       }`}
-                    />
-                    {validationErrors.project_id && (
-                      <p className="text-red-600 text-sm mt-1">{validationErrors.project_id}</p>
+                    >
+                      <option value="">-- Select Client --</option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {client.name}
+                        </option>
+                      ))}
+                    </select>
+                    {validationErrors.client_id && (
+                      <p className="text-red-600 text-sm mt-1">{validationErrors.client_id}</p>
                     )}
                   </div>
+                </div>
 
+                {/* Issue Date */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-slate-900 mb-2">Issue Date</label>
                     <input
@@ -406,79 +556,97 @@ const CreateInvoice = () => {
                       onChange={handleChange}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                     />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-900 mb-2">
-                      Total Amount <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      name="total_amount"
-                      value={formData.total_amount}
-                      onChange={handleChange}
-                      placeholder="Enter total amount"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.total_amount ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
-                      }`}
-                    />
-                    {validationErrors.total_amount && (
-                      <p className="text-red-600 text-sm mt-1">{validationErrors.total_amount}</p>
+                    {validationErrors.issue_date && (
+                      <p className="text-red-600 text-sm mt-1">{validationErrors.issue_date}</p>
                     )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-900 mb-2">Days</label>
-                    <input
-                      type="number"
-                      name="days"
-                      value={formData.days}
-                      onChange={handleChange}
-                      placeholder="Days"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                    />
-                  </div>
+                {/* Projects & Employees nested UI */}
+                <div>
+                  {/* Projects */}
+                  {projectsWithEmployees.length > 0 && (
+                    <div className="mb-4">
+                      <h3 className="text-lg font-medium text-slate-900 mb-2">Projects</h3>
+                      <div className="space-y-3">
+                        {projectsWithEmployees.map((proj) => (
+                          <div key={proj.id} className="bg-slate-50 rounded-lg p-4 border">
+                            <div className="flex items-center justify-between mb-3">
+                              <label className="flex items-center gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={checkedProjects.has(proj.id)}
+                                  onChange={() => toggleProject(proj.id)}
+                                  className="h-4 w-4 accent-blue-600"
+                                />
+                                <span className="font-semibold text-slate-800">{proj.project_name || proj.name}</span>
+                              </label>
+                            </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-900 mb-2">Paid Leaves</label>
-                    <input
-                      type="number"
-                      name="paid_leaves"
-                      value={formData.paid_leaves}
-                      onChange={handleChange}
-                      placeholder="Paid leaves"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                    />
-                  </div>
+                            {/* Employees for the project */}
+                            <div className="space-y-2">
+                              {(proj.employees || []).map((emp) => {
+                                const empId = emp.id
+                                const empVals = employeeInputs[empId] || { days: "", paid_leaves: "", unpaid_leaves: "", over_time: "" }
+                                return (
+                                  <div key={emp.id} className="grid grid-cols-12 gap-3 items-center bg-white p-2 rounded-md">
+                                    <div className="col-span-3 flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={checkedEmployees.has(empId)}
+                                        onChange={() => toggleEmployee(empId)}
+                                        className="h-4 w-4 accent-green-600"
+                                      />
+                                      <div className="text-sm font-medium text-slate-900">{emp.name}</div>
+                                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-900 mb-2">Unpaid Leaves</label>
-                    <input
-                      type="number"
-                      name="unpaid_leaves"
-                      value={formData.unpaid_leaves}
-                      onChange={handleChange}
-                      placeholder="Unpaid leaves"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                    />
-                  </div>
+                                    <div className="col-span-9 grid grid-cols-4 gap-2">
+                                      <input
+                                        type="number"
+                                        placeholder="Days"
+                                        value={empVals.days}
+                                        onChange={(e) => handleEmployeeInputChange(empId, "days", e.target.value)}
+                                        className="w-full px-2 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                      />
+                                      <input
+                                        type="number"
+                                        placeholder="Paid Leaves"
+                                        value={empVals.paid_leaves}
+                                        onChange={(e) => handleEmployeeInputChange(empId, "paid_leaves", e.target.value)}
+                                        className="w-full px-2 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                      />
+                                      <input
+                                        type="number"
+                                        placeholder="Unpaid Leaves"
+                                        value={empVals.unpaid_leaves}
+                                        onChange={(e) => handleEmployeeInputChange(empId, "unpaid_leaves", e.target.value)}
+                                        className="w-full px-2 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                      />
+                                      <input
+                                        type="number"
+                                        placeholder="Overtime"
+                                        value={empVals.over_time}
+                                        onChange={(e) => handleEmployeeInputChange(empId, "over_time", e.target.value)}
+                                        className="w-full px-2 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                      />
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-900 mb-2">Overtime</label>
-                    <input
-                      type="number"
-                      name="over_time"
-                      value={formData.over_time}
-                      onChange={handleChange}
-                      placeholder="Overtime"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                    />
-                  </div>
+                  {/* If no projects loaded but a client chosen, show message */}
+                  {formData.client_id && projectsWithEmployees.length === 0 && (
+                    <p className="text-sm text-slate-500">No projects/employees found for the selected client.</p>
+                  )}
                 </div>
 
+                {/* Buttons */}
                 <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
                   <button
                     type="button"
@@ -487,6 +655,10 @@ const CreateInvoice = () => {
                       setFormData(emptyForm)
                       setEditingId(null)
                       setValidationErrors({})
+                      setProjectsWithEmployees([])
+                      setCheckedProjects(new Set())
+                      setCheckedEmployees(new Set())
+                      setEmployeeInputs({})
                     }}
                     className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
                   >
@@ -513,19 +685,64 @@ const CreateInvoice = () => {
             </div>
             <div className="p-6">
               <div className="bg-slate-50 rounded-lg p-6 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {Object.entries(formData).map(([key, val]) => (
-                    <div key={key}>
-                      <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
-                        {key.replace("_", " ")}
-                      </p>
-                      <p className="text-lg font-semibold text-slate-900">{val || "—"}</p>
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Invoice No</p>
+                    <p className="text-lg font-semibold text-slate-900">{formData.invoice_no || "—"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Client</p>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {clients.find((c) => String(c.id) === String(formData.client_id))?.name || "—"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Issue Date</p>
+                    <p className="text-lg font-semibold text-slate-900">{formData.issue_date || "—"}</p>
+                  </div>
+
+                  {/* Projects & Employees summary */}
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-2">Projects & Employees</p>
+                    <div className="space-y-3">
+                      {projectsWithEmployees
+                        .filter((p) => checkedProjects.has(p.id))
+                        .map((p) => (
+                          <div key={p.id} className="p-3 bg-white rounded-md border">
+                            <div className="font-semibold text-slate-800 mb-2">{p.project_name}</div>
+                            <div className="space-y-2">
+                              {(p.employees || [])
+                                .filter((e) => checkedEmployees.has(e.id))
+                                .map((e) => {
+                                  const vals = employeeInputs[e.id] || {}
+                                  return (
+                                    <div key={e.id} className="flex items-center justify-between">
+                                      <div className="text-sm text-slate-900">{e.name}</div>
+                                      <div className="text-sm text-slate-700">
+                                        days: {vals.days || 0} • paid: {vals.paid_leaves || 0} • unpaid: {vals.unpaid_leaves || 0} • ot: {vals.over_time || 0}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                            </div>
+                          </div>
+                        ))}
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Calculated Total Amount */}
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Total Amount</p>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {computePreviewTotal().toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
+              <div className="flex justify-end gap-3">
                 <button
                   onClick={handleEditPreview}
                   className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
@@ -537,30 +754,30 @@ const CreateInvoice = () => {
                   disabled={loading}
                   className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors"
                 >
-                  {loading ? "Submitting..." : "Submit"}
+                  Confirm & Submit
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {deleteId && (
+      {deleteId && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
             <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
               <h2 className="text-lg font-semibold text-slate-900 mb-2">Delete Invoice?</h2>
               <p className="text-sm text-slate-600 mb-6">This action cannot be undone.</p>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setDeleteId(null)}
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteId(null)}
                   className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDelete}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
                   disabled={loading}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium rounded-lg transition-colors"
-                >
+              >
                   {loading ? "Deleting..." : "Delete"}
                 </button>
               </div>
@@ -583,43 +800,41 @@ const CreateInvoice = () => {
         )}
 
         {!showForm && !showPreview && !showSample && (
-          <>
-            <div className="bg-white rounded-lg overflow-hidden">
-              <div className="py-4">
-                <h3 className="text-lg font-semibold text-slate-900">
-                  Invoices <span className="text-slate-500 font-normal">({invoices.length})</span>
-                </h3>
-                <p className="text-sm text-slate-600 mt-1">
-                  {loading
-                    ? "Loading invoices..."
-                    : `Managing ${invoices.length} invoice${invoices.length !== 1 ? "s" : ""}`}
-                </p>
-              </div>
-              <div className="ag-theme-quartz" style={{ height: "500px", width: "100%" }}>
-                <AgGridReact
-                  rowData={invoices}
-                  columnDefs={columnDefs}
-                  pagination={true}
-                  paginationPageSize={10}
-                  rowSelection="single"
-                  animateRows={true}
-                  onGridReady={onGridReady}
-                  ref={gridApiRef}
-                  defaultColDef={{
-                    resizable: true,
-                    sortable: true,
-                    filter: true,
-                  }}
-                  overlayNoRowsTemplate={
-                    invoices.length === 0
-                      ? "<span>No invoices yet. Create your first invoice to get started!</span>"
-                      : ""
-                  }
-                />
-              </div>
+          <div className="bg-white rounded-lg overflow-hidden">
+            <div className="py-4">
+              <h3 className="text-lg font-semibold text-slate-900">
+                Invoices <span className="text-slate-500 font-normal">({invoices.length})</span>
+              </h3>
+              <p className="text-sm text-slate-600 mt-1">
+                {loading
+                  ? "Loading invoices..."
+                  : `Managing ${invoices.length} invoice${invoices.length !== 1 ? "s" : ""}`}
+              </p>
             </div>
-          </>
-        )}
+            <div className="ag-theme-quartz" style={{ height: "500px", width: "100%" }}>
+              <AgGridReact
+                rowData={invoices}
+                columnDefs={columnDefs}
+                pagination={true}
+                paginationPageSize={10}
+                rowSelection="single"
+                animateRows={true}
+                onGridReady={onGridReady}
+                ref={gridApiRef}
+                defaultColDef={{
+                  resizable: true,
+                  sortable: true,
+                  filter: true,
+                }}
+                overlayNoRowsTemplate={
+                  invoices.length === 0
+                    ? "<span>No invoices yet. Create your first invoice to get started!</span>"
+                    : ""
+                }
+              />
+          </div>
+        </div>
+      )}
       </div>
     </div>
   )
