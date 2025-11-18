@@ -8,10 +8,10 @@ import GeneratePDF from "./GeneratePDF"
 import LoaderOverlay from "./LoaderOverlay"
 import toast, { Toaster } from "react-hot-toast"
 
-const API_URL = "http://localhost:3000/api/invoices"
-const CLIENT_API_URL = "http://localhost:3000/api/clients"
-// const API_URL = "https://pgsql-invoice.onrender.com/api/invoices";
-// const CLIENT_API_URL = "https://pgsql-invoice.onrender.com/api/clients";
+// const API_URL = "http://localhost:3000/api/invoices"
+// const CLIENT_API_URL = "http://localhost:3000/api/clients"
+const API_URL = "https://pgsql-invoice.onrender.com/api/invoices";
+const CLIENT_API_URL = "https://pgsql-invoice.onrender.com/api/clients";
 
 const emptyForm = {
   invoice_no: "",
@@ -55,20 +55,12 @@ const CreateInvoice = () => {
   const [validationErrors, setValidationErrors] = useState({})
   const gridApiRef = useRef(null)
   const [deleteId, setDeleteId] = useState(null)
-
-  // New: store projects+employees structure returned by backend for selected client
-  // projectsWithEmployees: [{ id, project_name, employees: [{ id, name }] }]
   const [projectsWithEmployees, setProjectsWithEmployees] = useState([])
-
-  // Track checked state for projects and employees (default checked)
   const [checkedProjects, setCheckedProjects] = useState(new Set())
   const [checkedEmployees, setCheckedEmployees] = useState(new Set())
-
-  // Per-employee numeric inputs
-  // shape: { [employeeId]: { days: number, paid_leaves: number, unpaid_leaves: number, over_time: number } }
   const [employeeInputs, setEmployeeInputs] = useState({})
 
-  // Rates (used for preview total calculation). Keep same values you used before.
+  // TODO
   const dailyRate = 1000
   const overtimeRate = 200
 
@@ -106,9 +98,10 @@ const CreateInvoice = () => {
       if (!res.ok) throw new Error("Failed to fetch clients")
       const data = await res.json()
       setClients(Array.isArray(data) ? data : [])
-    } catch (err) {
-      toast.error("Error fetching clients")
-    }
+    }catch (err) {
+  console.error("Error fetching clients:", err)
+  toast.error("Error fetching clients")
+}
   }
 
   // Fetch client details (projects + employees) when a client is selected
@@ -128,7 +121,7 @@ const CreateInvoice = () => {
           employees: Array.isArray(p.employees) ? p.employees : [],
         }))
       } else if (Array.isArray(data.projects)) {
-        // try to map employees_by_project if present
+        // map employees_by_project if present
         const employeesByProject = data.employees_by_project || {}
         normalized = data.projects.map((p) => ({
           id: p.id,
@@ -157,23 +150,29 @@ const CreateInvoice = () => {
       setProjectsWithEmployees(normalized)
 
       // auto-check all projects and employees
-      const projSet = new Set()
-      const empSet = new Set()
-      const inputs = { ...employeeInputs } // preserve existing where possible
+      const projSet = new Set(normalized.map((p) => p.id));
 
+      const empSet = new Set(
+        normalized.flatMap((p) => (p.employees || []).map((e) => e.id))
+      );
+
+      // Prepare inputs safely
+      const inputs = {};
       normalized.forEach((p) => {
-        projSet.add(p.id)
         (p.employees || []).forEach((e) => {
-          empSet.add(e.id)
-          if (!inputs[e.id]) {
-            inputs[e.id] = { days: "", paid_leaves: "", unpaid_leaves: "", over_time: "" }
-          }
-        })
-      })
+          inputs[e.id] = employeeInputs[e.id] || {
+            days: "",
+            paid_leaves: "",
+            unpaid_leaves: "",
+            over_time: "",
+          };
+        });
+      });
 
-      setCheckedProjects(projSet)
-      setCheckedEmployees(empSet)
-      setEmployeeInputs(inputs)
+      setCheckedProjects(projSet);
+      setCheckedEmployees(empSet);
+      setEmployeeInputs(inputs);
+
     } catch (err) {
       console.error(err)
       toast.error(err instanceof Error ? err.message : "Failed to fetch client details")
@@ -212,17 +211,39 @@ const CreateInvoice = () => {
   }
 
   const handleEdit = (invoice) => {
+    if (!invoice) {
+      console.error("❌ handleEdit called without invoice");
+      return;
+    }
+
+    console.log("📌 Editing invoice:", invoice);
+
     setFormData({
       invoice_no: invoice.invoice_no || "",
       client_id: invoice.client_id?.toString?.() || "",
       issue_date: invoice.issue_date ? invoice.issue_date.slice(0, 10) : "",
-    })
-    setEditingId(invoice.id)
-    resetAllViews()
-    setShowForm(true)
-    setValidationErrors({})
-    if (invoice.client_id) fetchClientDetails(invoice.client_id)
-  }
+    });
+
+    // FIX: support all possible keys
+    const id =
+      invoice.id ||
+      invoice.invoice_id ||
+      invoice._id ||
+      null;
+
+    if (!id) {
+      console.error("❌ Invoice ID missing:", invoice);
+    }
+
+    setEditingId(id);
+
+    resetAllViews();
+    setShowForm(true);
+    setValidationErrors({});
+
+    if (invoice.client_id) fetchClientDetails(invoice.client_id);
+  };
+
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -253,37 +274,30 @@ const CreateInvoice = () => {
   }
 
   const handleFinalSubmit = async () => {
-    setLoading(true)
+    setLoading(true);
+
     try {
-      // prepare payload based on checked projects & employees and their inputs
-      const project_ids = Array.from(checkedProjects)
-      const employee_entries = [] // to gather employee ids (only checked)
-      // optional: include per-employee details in the payload if backend expects them
+      // Prepare base payload
+      const project_ids = Array.from(checkedProjects);
+
+      const employee_entries = [];
       Object.keys(employeeInputs).forEach((eid) => {
-        const idNum = Number(eid)
+        const idNum = Number(eid);
         if (checkedEmployees.has(idNum)) {
-          const vals = employeeInputs[eid] || {}
+          const vals = employeeInputs[eid] || {};
           employee_entries.push({
             employee_id: idNum,
             days: Number(vals.days || 0),
             paid_leaves: Number(vals.paid_leaves || 0),
             unpaid_leaves: Number(vals.unpaid_leaves || 0),
             over_time: Number(vals.over_time || 0),
-          })
+          });
         }
-      })
+      });
 
-      // totalAmount calculated same as preview (sum employee wise using rates)
-      let total_amount = 0
-      employee_entries.forEach((entry) => {
-        const payableDays = Math.max(0, Number(entry.days || 0) - Number(entry.unpaid_leaves || 0))
-        total_amount += payableDays * dailyRate + Number(entry.over_time || 0) * overtimeRate
-      })
-
+      // Main invoice payload
       const payload = {
-        invoice_no: formData.invoice_no,
-        client_id: Number(formData.client_id),
-        issue_date: formData.issue_date || new Date(),
+        ...formData,
         project_ids,
         employees: employee_entries, // structured employee entries (id + values)
         total_amount,
@@ -292,7 +306,7 @@ const CreateInvoice = () => {
       const res = await fetch(editingId ? `${API_URL}/${editingId}` : API_URL, {
         method: editingId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+          body: JSON.stringify(payload),
       })
 
       if (!res.ok) {
@@ -411,58 +425,58 @@ const CreateInvoice = () => {
   }
 
   const columnDefs = [
-  {
-    field: "invoice_no",
-    headerName: "Invoice No",
-    minWidth: 130,
-    filter: true,
-    floatingFilter: true,
-    sortable: true,
-    resizable: true,
-  },
-  {
-    field: "client_name",
-    headerName: "Client Name",
-    minWidth: 150,
-    filter: true,
-    floatingFilter: true,
-    sortable: true,
-    resizable: true,
-  },
-  {
-    field: "issue_date",
-    headerName: "Issue Date",
-    minWidth: 130,
-    filter: true,
-    floatingFilter: true,
-    sortable: true,
-    resizable: true,
-  },
-  {
-    field: "total_amount",
-    headerName: "Total Amount",
-    minWidth: 130,
-    filter: true,
-    floatingFilter: true,
-    sortable: true,
-    resizable: true,
-  },
-  {
-    field: "Actions",
-    headerName: "Actions",
-    minWidth: 220,
-    cellRenderer: (params) => (
-      <ActionCellRenderer
-        data={params.data}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onGeneratePdf={handleGeneratePdf}
-      />
-    ),
-    sortable: false,
-    filter: false,
-    resizable: true,
-  },
+    {
+      field: "invoice_no",
+      headerName: "Invoice No",
+      minWidth: 130,
+      filter: true,
+      floatingFilter: true,
+      sortable: true,
+      resizable: true,
+    },
+    {
+      field: "client_name",
+      headerName: "Client Name",
+      minWidth: 150,
+      filter: true,
+      floatingFilter: true,
+      sortable: true,
+      resizable: true,
+    },
+    {
+      field: "issue_date",
+      headerName: "Issue Date",
+      minWidth: 130,
+      filter: true,
+      floatingFilter: true,
+      sortable: true,
+      resizable: true,
+    },
+    {
+      field: "total_amount",
+      headerName: "Total Amount",
+      minWidth: 130,
+      filter: true,
+      floatingFilter: true,
+      sortable: true,
+      resizable: true,
+    },
+    {
+      field: "Actions",
+      headerName: "Actions",
+      minWidth: 220,
+      cellRenderer: (params) => (
+        <ActionCellRenderer
+          data={params.data}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onGeneratePdf={handleGeneratePdf}
+        />
+      ),
+      sortable: false,
+      filter: false,
+      resizable: true,
+    },
   ]
 
   return (
@@ -513,7 +527,7 @@ const CreateInvoice = () => {
                       placeholder="Enter invoice number"
                       className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
                         validationErrors.invoice_no ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
-                      }`}
+                        }`}
                     />
                     {validationErrors.invoice_no && (
                       <p className="text-red-600 text-sm mt-1">{validationErrors.invoice_no}</p>
@@ -528,9 +542,8 @@ const CreateInvoice = () => {
                       name="client_id"
                       value={formData.client_id}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.client_id ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${validationErrors.client_id ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                        }`}
                     >
                       <option value="">-- Select Client --</option>
                       {clients.map((client) => (
@@ -761,23 +774,23 @@ const CreateInvoice = () => {
           </div>
         )}
 
-      {deleteId && (
+        {deleteId && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
             <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
               <h2 className="text-lg font-semibold text-slate-900 mb-2">Delete Invoice?</h2>
               <p className="text-sm text-slate-600 mb-6">This action cannot be undone.</p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setDeleteId(null)}
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setDeleteId(null)}
                   className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
                   disabled={loading}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium rounded-lg transition-colors"
-              >
+                >
                   {loading ? "Deleting..." : "Delete"}
                 </button>
               </div>
@@ -832,9 +845,9 @@ const CreateInvoice = () => {
                     : ""
                 }
               />
+            </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
     </div>
   )
