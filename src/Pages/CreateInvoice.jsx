@@ -6,12 +6,12 @@ import "ag-grid-community/styles/ag-theme-quartz.css"
 import DashboardPdf from "../Components/DashboardPdf"
 import GeneratePDF from "./GeneratePDF"
 import LoaderOverlay from "./LoaderOverlay"
-import toast, { Toaster } from "react-hot-toast"
+import toast, { Toaster } from "react-hot-toast";
 
-// const API_URL = "http://localhost:3000/api/invoices"
-// const CLIENT_API_URL = "http://localhost:3000/api/clients"
-const API_URL = "https://pgsql-invoice.onrender.com/api/invoices";
-const CLIENT_API_URL = "https://pgsql-invoice.onrender.com/api/clients";
+const API_URL = "http://localhost:3000/api/invoices"
+const CLIENT_API_URL = "http://localhost:3000/api/clients"
+// const API_URL = "https://pgsql-invoice.onrender.com/api/invoices";
+// const CLIENT_API_URL = "https://pgsql-invoice.onrender.com/api/clients";
 
 const emptyForm = {
   invoice_no: "",
@@ -59,6 +59,7 @@ const CreateInvoice = () => {
   const [checkedProjects, setCheckedProjects] = useState(new Set())
   const [checkedEmployees, setCheckedEmployees] = useState(new Set())
   const [employeeInputs, setEmployeeInputs] = useState({})
+  const [generatedInvoice, setGeneratedInvoice] = useState(null);
 
   // TODO
   const dailyRate = 1000
@@ -98,10 +99,10 @@ const CreateInvoice = () => {
       if (!res.ok) throw new Error("Failed to fetch clients")
       const data = await res.json()
       setClients(Array.isArray(data) ? data : [])
-    }catch (err) {
-  console.error("Error fetching clients:", err)
-  toast.error("Error fetching clients")
-}
+    } catch (err) {
+      console.error("Error fetching clients:", err)
+      toast.error("Error fetching clients")
+    }
   }
 
   // Fetch client details (projects + employees) when a client is selected
@@ -117,46 +118,74 @@ const CreateInvoice = () => {
       if (Array.isArray(data.projectsWithEmployees)) {
         normalized = data.projectsWithEmployees.map((p) => ({
           id: p.id,
-          project_name: p.project_name || p.name || p.project_name,
+          project_name: p.project_name || p.name,
+          billing_amt: p.billing_amt || 0,
+          billing_method: p.billing_method || "days",
+          overtime_amt: p.overtime_amt || 0,
           employees: Array.isArray(p.employees) ? p.employees : [],
-        }))
-      } else if (Array.isArray(data.projects)) {
-        // map employees_by_project if present
-        const employeesByProject = data.employees_by_project || {}
+        }));
+      }
+
+      // ----------------------------------------
+      // Case 2: { projects: [...], employees_by_project: {...} }
+      // ----------------------------------------
+      else if (Array.isArray(data.projects)) {
+        const employeesByProject = data.employees_by_project || {};
         normalized = data.projects.map((p) => ({
           id: p.id,
           project_name: p.project_name || p.name,
+          billing_amt: p.billing_amt || 0,
+          billing_method: p.billing_method || "days",
+          overtime_amt: p.overtime_amt || 0,
           employees: employeesByProject[p.id] || [],
-        }))
-      } else if (Array.isArray(data)) {
-        // if backend returns a combined flat array where each row contains project + employee, e.g.
-        // [{ project_id, project_name, employee_id, employee_name }, ...]
-        // transform into projects -> employees grouping.
-        const map = new Map()
-        data.forEach((row) => {
-          const pid = row.project_id || row.id || row.projectId
-          const pname = row.project_name || row.name || row.projectName
-          const eid = row.employee_id || row.emp_id || row.employeeId
-          const ename = row.employee_name || row.emp_name || row.employeeName
-          if (!map.has(pid)) map.set(pid, { id: pid, project_name: pname, employees: [] })
-          if (eid) map.get(pid).employees.push({ id: eid, name: ename })
-        })
-        normalized = Array.from(map.values())
-      } else {
-        // fallback: try direct fields
-        normalized = []
+        }));
       }
 
-      setProjectsWithEmployees(normalized)
+      // ----------------------------------------
+      // Case 3: Flat array (your current backend)
+      // ----------------------------------------
+      else if (Array.isArray(data)) {
+        const map = new Map();
 
-      // auto-check all projects and employees
+        data.forEach((row) => {
+          const pid = row.project_id;
+          const pname = row.project_name;
+
+          if (!map.has(pid)) {
+            map.set(pid, {
+              id: pid,
+              project_name: pname,
+              billing_amt: row.billing_amt || 0,
+              billing_method: row.billing_method || "days",
+              overtime_amt: row.overtime_amt || 0,
+              employees: [],
+            });
+          }
+
+          if (row.employee_id) {
+            map.get(pid).employees.push({
+              id: row.employee_id,
+              name: row.employee_name,
+            });
+          }
+        });
+
+        normalized = Array.from(map.values());
+      }
+
+      // ----------------------------------------
+      // Save to state
+      // ----------------------------------------
+      setProjectsWithEmployees(normalized);
+
+      // Auto-select all projects
       const projSet = new Set(normalized.map((p) => p.id));
 
       const empSet = new Set(
         normalized.flatMap((p) => (p.employees || []).map((e) => e.id))
       );
 
-      // Prepare inputs safely
+      // Prepare inputs
       const inputs = {};
       normalized.forEach((p) => {
         (p.employees || []).forEach((e) => {
@@ -224,7 +253,6 @@ const CreateInvoice = () => {
       issue_date: invoice.issue_date ? invoice.issue_date.slice(0, 10) : "",
     });
 
-    // FIX: support all possible keys
     const id =
       invoice.id ||
       invoice.invoice_id ||
@@ -277,9 +305,10 @@ const CreateInvoice = () => {
     setLoading(true);
 
     try {
-      // Prepare base payload
+      // 1 - collect project ids
       const project_ids = Array.from(checkedProjects);
 
+      // 2 - build employee_entries
       const employee_entries = [];
       Object.keys(employeeInputs).forEach((eid) => {
         const idNum = Number(eid);
@@ -291,44 +320,75 @@ const CreateInvoice = () => {
             paid_leaves: Number(vals.paid_leaves || 0),
             unpaid_leaves: Number(vals.unpaid_leaves || 0),
             over_time: Number(vals.over_time || 0),
+            overtime_rate: Number(vals.overtime_rate || 0),
           });
         }
       });
 
-      // Main invoice payload
+      // 3 - compute total
+      const totalAmount = computePreviewTotal();
+
+      // 4 - payload
       const payload = {
         ...formData,
         project_ids,
-        employees: employee_entries, // structured employee entries (id + values)
-        total_amount,
-      }
+        employees: employee_entries,
+        total_amount: totalAmount,
+      };
 
+      // 5 - call API
       const res = await fetch(editingId ? `${API_URL}/${editingId}` : API_URL, {
         method: editingId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-      })
+        body: JSON.stringify(payload),
+      });
 
       if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || "Failed to save invoice")
+        const txt = await res.text();
+        throw new Error(txt || "Failed to save invoice");
       }
 
-      await fetchInvoices()
-      resetAllViews()
-      setFormData(emptyForm)
-      setEditingId(null)
-      setProjectsWithEmployees([])
-      setCheckedProjects(new Set())
-      setCheckedEmployees(new Set())
-      setEmployeeInputs({})
-      toast.success(editingId ? "Invoice updated successfully!" : "Invoice created successfully!")
+      const result = await res.json();
+      // store server invoice cleanly
+      setGeneratedInvoice(result.invoice); // optional, if you still need it
+
+      // build unified pdf data shape
+      const pdfData = {
+        invoice: result.invoice,
+        client: clients.find((c) => String(c.id) === String(formData.client_id)) || null,
+        projects: projectsWithEmployees,
+        employeesRaw: employeeInputs,
+        employeeEntries: employee_entries,
+        selectedProjects: Array.from(checkedProjects),
+        selectedEmployees: Array.from(checkedEmployees),
+        totalAmount,
+      };
+
+      // set pdf state and show PDF (do NOT call resetAllViews here)
+      setPdfInvoiceData(pdfData);
+      setShowSample(true);
+      setShowForm(false);
+      setShowPreview(false);
+      toast.success(editingId ? "Invoice updated!" : "Invoice created!");
+
+      // OPTIONAL: clear the form fields but keep pdfInvoiceData/showSample intact
+      setFormData(emptyForm);
+      setEditingId(null);
+      setProjectsWithEmployees([]);
+      setCheckedProjects(new Set());
+      setCheckedEmployees(new Set());
+      setEmployeeInputs({});
+
+      // reload invoices list (if you want)
+      if (fetchInvoices) fetchInvoices();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create invoice")
+      toast.error(err?.message || "Failed to create invoice");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
+
+
 
   const handleDelete = (id) => setDeleteId(id)
 
@@ -349,20 +409,36 @@ const CreateInvoice = () => {
   }
 
   const handleGeneratePdf = async (id) => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/${id}`)
-      if (!res.ok) throw new Error("Failed to fetch invoice details")
-      const invoiceData = await res.json()
-      resetAllViews()
-      setPdfInvoiceData(invoiceData)
-      setShowSample(true)
+      const res = await fetch(`${API_URL}/${id}`);
+      if (!res.ok) throw new Error("Failed to fetch invoice details");
+      const apiRes = await res.json(); // depends on API shape
+
+      // If your API returns { message, invoice } use apiRes.invoice, otherwise adapt
+      const invoiceFromServer = apiRes.invoice || apiRes;
+
+      // Build a consistent pdfData object (you may need to fetch projects/employees for this invoice too)
+      const pdfData = {
+        invoice: invoiceFromServer,
+        client: clients.find((c) => String(c.id) === String(invoiceFromServer.client_id)) || null,
+        projects: projectsWithEmployees, // if you have to fetch project data for this invoice, call that API
+        employeesRaw: employeeInputs,
+        employeeEntries: [], // if you can fetch employee breakdown, populate here
+        selectedProjects: Array.from(checkedProjects),
+        selectedEmployees: Array.from(checkedEmployees),
+        totalAmount: Number(invoiceFromServer.total_amount || 0),
+      };
+
+      setPdfInvoiceData(pdfData);
+      setShowSample(true);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to generate PDF")
+      toast.error(err instanceof Error ? err.message : "Failed to generate PDF");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
+
 
   // toggle project checked
   const toggleProject = (projectId) => {
@@ -410,19 +486,37 @@ const CreateInvoice = () => {
 
   // compute total amount for preview
   const computePreviewTotal = () => {
-    let total = 0
+    let total = 0;
+
     Object.keys(employeeInputs).forEach((eid) => {
-      const idNum = Number(eid)
-      if (!checkedEmployees.has(idNum)) return
-      const vals = employeeInputs[eid] || {}
-      const days = Number(vals.days || 0)
-      const unpaid = Number(vals.unpaid_leaves || 0)
-      const overtime = Number(vals.over_time || 0)
-      const payableDays = Math.max(0, days - unpaid)
-      total += payableDays * dailyRate + overtime * overtimeRate
-    })
-    return total
-  }
+      const idNum = Number(eid);
+      if (!checkedEmployees.has(idNum)) return;
+
+      const vals = employeeInputs[eid] || {};
+      const days = Number(vals.days || 0);
+      const unpaid = Number(vals.unpaid_leaves || 0);
+      const overtime = Number(vals.over_time || 0);
+
+      const payableDays = Math.max(0, days - unpaid);
+
+      // 🔍 Find project for this employee
+      const project = projectsWithEmployees.find((p) =>
+        p.employees.some((e) => e.id === idNum)
+      );
+
+      if (!project) return;
+
+      // ⬅️ Take project-based daily & overtime rates
+      const dailyRate = Number(project.billing_amt || 0);
+      const overtimeRate = Number(project.overtime_amt || 0);
+
+      // 💰 Calculate employee total based on project rates
+      total += payableDays * dailyRate + overtime * overtimeRate;
+    });
+
+    return total;
+  };
+
 
   const columnDefs = [
     {
@@ -525,8 +619,7 @@ const CreateInvoice = () => {
                       value={formData.invoice_no}
                       onChange={handleChange}
                       placeholder="Enter invoice number"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.invoice_no ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${validationErrors.invoice_no ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
                         }`}
                     />
                     {validationErrors.invoice_no && (
@@ -798,19 +891,17 @@ const CreateInvoice = () => {
           </div>
         )}
 
-        {showSample && (
+        {showSample && pdfInvoiceData && (
           <div className="mt-4">
             <GeneratePDF invoiceData={pdfInvoiceData} />
             <div className="flex justify-center mt-4">
-              <button
-                onClick={() => resetAllViews()}
-                className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-semibold rounded-lg shadow-md transition-colors"
-              >
+              <button onClick={() => { setShowSample(false); setPdfInvoiceData(null); }} className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-semibold rounded-lg shadow-md transition-colors">
                 Back to List
               </button>
             </div>
           </div>
         )}
+
 
         {!showForm && !showPreview && !showSample && (
           <div className="bg-white rounded-lg overflow-hidden">

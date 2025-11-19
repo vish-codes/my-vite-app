@@ -5,9 +5,9 @@ import { jsPDF } from "jspdf";
 import { Download } from "lucide-react";
 
 const GeneratePDF = ({ invoiceData }) => {
-  console.log("Invoice DAta=== ",invoiceData);
-  const invoice = invoiceData || {};
   const [pdfUrl, setPdfUrl] = useState("");
+
+  console.log("Invoice Data === ", invoiceData);
 
   useEffect(() => {
     if (invoiceData && Object.keys(invoiceData).length > 0) {
@@ -15,64 +15,85 @@ const GeneratePDF = ({ invoiceData }) => {
     }
   }, [invoiceData]);
 
-  // ✅ Common Data for PDF Header
+  // --------------------------
+  // Extract data from invoiceData
+  // --------------------------
+  const {
+    invoice,
+    client,
+    projects,
+    employeesRaw,
+    employeeEntries,
+  } = invoiceData || {};
+
+  // --------------------------
+  // Common Info for PDF Header
+  // --------------------------
   const commonDataForPdf = {
     invoiceNo: invoice?.invoice_no || "N/A",
     dateOfInvoice: invoice?.issue_date
       ? new Date(invoice.issue_date).toLocaleDateString()
       : "N/A",
-    companyName: invoice?.company_name || "N/A",
-    companyAccountNumber: invoice?.company_bank_account_number || "N/A",
-    companyIfscCode: invoice?.company_ifsc_code || "N/A",
-    companyState: invoice?.company_state || "N/A",
-    companyGst: invoice?.company_gst_number || "N/A",
-    companyPan: invoice?.company_pan || "N/A",
-    clientName: invoice?.client_name || "N/A",
-    clientAddress: invoice?.client_address || "N/A",
-    add2: "Gurgaon, Haryana - 122001",
-    clientState: invoice?.client_state || "N/A",
-    clientGst: invoice?.client_gst_number || "N/A",
+
+    // Company info (coming from client.company_name)
+    companyName: client?.company_name || "Company Name",
+    companyAccountNumber: client?.company_bank_account_number || "N/A",
+    companyIfscCode: client?.company_ifsc_code || "N/A",
+    companyState: client?.state || "N/A",
+    companyGst: client?.gst_number || "N/A",
+    companyPan: client?.pan_number || "N/A",
+
+    // Client info
+    clientName: client?.name || "N/A",
+    clientAddress: client?.address || "",
+    add2: client?.state || "",
+    clientState: client?.state || "",
+    clientGst: client?.gst_number || "",
+
     gstRate: 18,
     currencyType: "INR",
   };
 
-  // ✅ Dynamic resources (employees)
+  // --------------------------
+  // Build resources array for PDF Body
+  // --------------------------
   const resourcesArr =
-    invoice?.employees && invoice.employees.length > 0
-      ? invoice.employees.map((emp, i) => ({
-          userId: emp.id || `EMP-${i + 1}`,
-          employeeName: emp.employee_name,
-          workingOn: invoice.project_name || "Project",
-          sacCode: "9983",
-          fromDate: emp.from_date || invoice.from_date || "1st Nov 2025",
-          toDate: emp.to_date || invoice.to_date || "30th Nov 2025",
-          days: emp.days || 0,
-          hours: 8,
-          payPerDay:
-            emp.total_amount && emp.days
-              ? Math.round(Number(emp.total_amount) / emp.days)
-              : 0,
-          totalAmount: emp.total_amount || 0,
-        }))
-      : [
-          {
-            userId: "123",
-            employeeName: invoice?.employee_name || "Employee",
-            workingOn: invoice?.project_name || "Project",
-            sacCode: "9983",
-            fromDate: "1st November 2025",
-            toDate: "30th November 2025",
-            days: invoice?.days || 0,
-            hours: 8,
-            payPerDay:
-              invoice?.total_amount && invoice?.days
-                ? Math.round(Number(invoice.total_amount) / invoice.days)
-                : 0,
-            totalAmount: invoice?.total_amount || 0,
-          },
-        ];
+    employeeEntries && employeeEntries.length > 0
+      ? employeeEntries.map((emp) => {
+          const project = projects?.find((p) =>
+            p.employees.some((e) => e.id === emp.employee_id)
+          );
 
-  // ✅ Calculate total for all employees
+          const empRaw = employeesRaw?.[String(emp.employee_id)] || {};
+
+          const payPerDay = project?.billing_amt
+            ? Number(project.billing_amt)
+            : 0;
+
+          const total = payPerDay * (emp.days || 0);
+
+          return {
+            userId: emp.employee_id,
+            employeeName:
+              project?.employees.find((e) => e.id === emp.employee_id)?.name ||
+              "Employee",
+            workingOn: project?.project_name || "Project",
+            sacCode: "9983",
+
+            fromDate: "1 Nov 2025",
+            toDate: "30 Nov 2025",
+
+            days: emp.days || 0,
+            hours: 8,
+            payPerDay: payPerDay,
+            totalAmount: total,
+          };
+        })
+      : [];
+
+  // --------------------------
+  // Calculate Totals
+  // --------------------------
   const calculateTotals = (gstRate) => {
     const subTotal = resourcesArr.reduce(
       (acc, val) => acc + val.payPerDay * val.days,
@@ -85,7 +106,9 @@ const GeneratePDF = ({ invoiceData }) => {
 
   const totals = calculateTotals(commonDataForPdf.gstRate);
 
-  // ✅ Generate PDF
+  // --------------------------
+  // PDF Generation
+  // --------------------------
   const generatePDF = (status) => {
     const doc = new jsPDF({
       orientation: "portrait",
@@ -93,7 +116,7 @@ const GeneratePDF = ({ invoiceData }) => {
       format: [300, 225],
     });
 
-    // Header
+    // ---------- HEADER ----------
     doc.setFontSize(15);
     doc.text(commonDataForPdf.companyName, 30, 32);
     doc.setFont("helvetica", "bold");
@@ -106,7 +129,7 @@ const GeneratePDF = ({ invoiceData }) => {
     doc.text("Sector - 135, Noida,", 30, 46);
     doc.text("Uttar Pradesh - 201305", 30, 50);
 
-    // Bank Details
+    // ---------- BANK DETAILS ----------
     doc.rect(30, 56, 170, 20);
     doc.line(110, 56, 110, 76);
     doc.line(110, 62, 200, 62);
@@ -119,22 +142,23 @@ const GeneratePDF = ({ invoiceData }) => {
     doc.text(`Account No - ${commonDataForPdf.companyAccountNumber}`, 32, 69);
     doc.text(`IFSC Code - ${commonDataForPdf.companyIfscCode}`, 32, 73);
 
-    // Company Info
     doc.setFontSize(8.8);
     doc.setFont("helvetica", "bold");
     doc.text(`Date of Invoice: `, 130, 60.5);
     doc.setFont("helvetica", "normal");
     doc.text(`${commonDataForPdf.dateOfInvoice}`, 154.6, 60.5);
+
     doc.setFont("helvetica", "bold");
     doc.text("GSTIN: ", 130, 67);
     doc.setFont("helvetica", "normal");
     doc.text(`${commonDataForPdf.companyGst}`, 141.8, 67);
+
     doc.setFont("helvetica", "bold");
     doc.text("PAN: ", 130, 73.5);
     doc.setFont("helvetica", "normal");
     doc.text(`${commonDataForPdf.companyPan}`, 139, 73.5);
 
-    // Bill To
+    // ---------- BILL TO ----------
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.text("BILL TO", 34, 85.5).rect(32, 81, 52, 7);
@@ -150,7 +174,7 @@ const GeneratePDF = ({ invoiceData }) => {
     doc.setFont("helvetica", "normal");
     doc.text(commonDataForPdf.clientGst, 43, 122);
 
-    // Table
+    // ---------- TABLE ----------
     const startY = 130;
     const rowHeight = 14;
     const numRows = resourcesArr.length;
@@ -161,6 +185,7 @@ const GeneratePDF = ({ invoiceData }) => {
     doc.line(30, startY + 7, 195, startY + 7);
     doc.line(130, startY, 130, totalTableHeight);
     doc.line(160, startY, 160, totalTableHeight);
+
     doc.setFontSize(10.5);
     doc.setFont("helvetica", "bold");
     doc.text("DESCRIPTION", 66, startY + 5);
@@ -170,6 +195,7 @@ const GeneratePDF = ({ invoiceData }) => {
     resourcesArr.forEach((res, index) => {
       const currentY = startY + 11 + index * rowHeight;
       const temp = res.payPerDay * res.days;
+
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
       doc.text(
@@ -189,11 +215,12 @@ const GeneratePDF = ({ invoiceData }) => {
       doc.text(commonDataForPdf.currencyType, 185, currentY + 3.3);
       doc.text(res.sacCode, 141, currentY + 3.3);
 
-      if (index < numRows - 1)
+      if (index < numRows - 1) {
         doc.line(30, currentY + 10, 195, currentY + 10);
+      }
     });
 
-    // Totals
+    // ---------- TOTALS ----------
     const subtotalY = totalTableHeight - 10;
     const igstY = subtotalY + 7;
     const totalY = igstY + 7;
@@ -216,7 +243,7 @@ const GeneratePDF = ({ invoiceData }) => {
     doc.setFont("helvetica", "normal");
     doc.text("Thanks for your business.", 28, totalY + 8);
 
-    // Preview
+    // ---------- PREVIEW ----------
     const pdfBlob = doc.output("blob");
     const url = URL.createObjectURL(pdfBlob);
     setPdfUrl(url);
@@ -226,6 +253,9 @@ const GeneratePDF = ({ invoiceData }) => {
     }
   };
 
+  // --------------------------
+  // UI
+  // --------------------------
   return (
     <div className="w-full">
       {pdfUrl ? (
@@ -234,6 +264,7 @@ const GeneratePDF = ({ invoiceData }) => {
             <h3 className="text-lg font-semibold text-slate-900">
               Invoice Preview
             </h3>
+
             <button
               onClick={() => generatePDF("download")}
               className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
@@ -242,6 +273,7 @@ const GeneratePDF = ({ invoiceData }) => {
               Download PDF
             </button>
           </div>
+
           <div className="relative w-full" style={{ height: "600px" }}>
             <iframe
               src={pdfUrl}
