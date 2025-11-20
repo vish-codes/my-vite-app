@@ -15,9 +15,6 @@ const GeneratePDF = ({ invoiceData }) => {
     }
   }, [invoiceData]);
 
-  // --------------------------
-  // Extract data from invoiceData
-  // --------------------------
   const {
     invoice,
     client,
@@ -26,37 +23,31 @@ const GeneratePDF = ({ invoiceData }) => {
     employeeEntries,
   } = invoiceData || {};
 
-  // --------------------------
-  // Common Info for PDF Header
-  // --------------------------
-  const commonDataForPdf = {
-    invoiceNo: invoice?.invoice_no || "N/A",
-    dateOfInvoice: invoice?.issue_date
-      ? new Date(invoice.issue_date).toLocaleDateString()
-      : "N/A",
+const commonDataForPdf = {
+  invoiceNo: invoiceData?.invoice?.invoice_no || "N/A",
+  dateOfInvoice: invoiceData?.invoice?.issue_date
+    ? new Date(invoiceData.invoice.issue_date).toLocaleDateString()
+    : "N/A",
+  // COMPANY DETAILS (from backend)
+  companyName: invoiceData?.client?.company_name || "N/A",
+  companyAddress: invoiceData?.client?.company_address || "N/A",
+  companyState: invoiceData?.client?.company_state || "N/A",
+  companyGst: invoiceData?.client?.company_gst_number || "N/A",
+  companyPan: invoiceData?.client?.company_pan || "N/A",
+  companyAccountNumber:
+    invoiceData?.client?.company_bank_account_number || "N/A",
+  companyIfscCode: invoiceData?.client?.company_ifsc_code || "N/A",
+  // CLIENT DETAILS
+  clientName: invoiceData?.client?.name || "N/A",
+  clientAddress: invoiceData?.client?.address || "N/A",
+  clientState: invoiceData?.client?.client_state || "N/A",
+  clientGst: invoiceData?.client?.gst_number || "N/A",
 
-    // Company info (coming from client.company_name)
-    companyName: client?.company_name || "Company Name",
-    companyAccountNumber: client?.company_bank_account_number || "N/A",
-    companyIfscCode: client?.company_ifsc_code || "N/A",
-    companyState: client?.state || "N/A",
-    companyGst: client?.gst_number || "N/A",
-    companyPan: client?.pan_number || "N/A",
+  add2: "Gurgaon, Haryana - 122001",
+  gstRate:  invoiceData?.client?.tax_rate || "N/A",
+  currencyType: "INR",
+};
 
-    // Client info
-    clientName: client?.name || "N/A",
-    clientAddress: client?.address || "",
-    add2: client?.state || "",
-    clientState: client?.state || "",
-    clientGst: client?.gst_number || "",
-
-    gstRate: 18,
-    currencyType: "INR",
-  };
-
-  // --------------------------
-  // Build resources array for PDF Body
-  // --------------------------
   const resourcesArr =
     employeeEntries && employeeEntries.length > 0
       ? employeeEntries.map((emp) => {
@@ -91,9 +82,6 @@ const GeneratePDF = ({ invoiceData }) => {
         })
       : [];
 
-  // --------------------------
-  // Calculate Totals
-  // --------------------------
   const calculateTotals = (gstRate) => {
     const subTotal = resourcesArr.reduce(
       (acc, val) => acc + val.payPerDay * val.days,
@@ -106,9 +94,6 @@ const GeneratePDF = ({ invoiceData }) => {
 
   const totals = calculateTotals(commonDataForPdf.gstRate);
 
-  // --------------------------
-  // PDF Generation
-  // --------------------------
   const generatePDF = (status) => {
     const doc = new jsPDF({
       orientation: "portrait",
@@ -168,7 +153,6 @@ const GeneratePDF = ({ invoiceData }) => {
     doc.setFontSize(9);
     doc.text(commonDataForPdf.clientAddress, 30, 106);
     doc.text(commonDataForPdf.add2, 30, 110);
-    doc.text(commonDataForPdf.clientState, 30, 114);
     doc.setFont("helvetica", "bold");
     doc.text("GSTIN: ", 30, 122);
     doc.setFont("helvetica", "normal");
@@ -230,7 +214,7 @@ const GeneratePDF = ({ invoiceData }) => {
     doc.text(totals.subTotal.toFixed(2), 173, subtotalY - 5);
     doc.text(commonDataForPdf.currencyType, 185, subtotalY - 5);
 
-    doc.text(`IGST ${commonDataForPdf.gstRate}%`, 31.5, igstY - 6);
+    doc.text(`IGST ${commonDataForPdf.gstRate}`, 31.5, igstY - 6);
     doc.text(totals.igst.toFixed(2), 173, igstY - 6);
     doc.text(commonDataForPdf.currencyType, 185, igstY - 6);
 

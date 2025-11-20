@@ -8,9 +8,6 @@ import GeneratePDF from "./GeneratePDF"
 import LoaderOverlay from "./LoaderOverlay"
 import toast, { Toaster } from "react-hot-toast";
 
-// const API_URL = "http://localhost:3000/api/invoices"
-// const CLIENT_API_URL = "http://localhost:3000/api/clients"
-
 const API_URL = import.meta.env.VITE_STATE === "DEV" ? `${import.meta.env.VITE_BASE_URL_DEV}/invoices` : `${import.meta.env.VITE_BASE_URL_PROD}/invoices`;
 
 const CLIENT_API_URL = import.meta.env.VITE_STATE === "DEV" ? `${import.meta.env.VITE_BASE_URL_DEV}/clients` : `${import.meta.env.VITE_BASE_URL_PROD}/clients`;
@@ -21,7 +18,7 @@ const emptyForm = {
   issue_date: "",
 }
 
-const ActionCellRenderer = ({ data, onEdit, onDelete, onGeneratePdf }) => (
+const ActionCellRenderer = ({ data, onEdit, onDelete }) => (
   <div className="flex gap-2 justify-end h-full items-center">
     <button
       onClick={() => onEdit(data)}
@@ -34,12 +31,6 @@ const ActionCellRenderer = ({ data, onEdit, onDelete, onGeneratePdf }) => (
       className="inline-flex items-center gap-1 px-3 py-1 text-red-600 hover:bg-red-50 rounded transition-colors font-medium text-sm"
     >
       Delete
-    </button>
-    <button
-      onClick={() => onGeneratePdf(data.id)}
-      className="inline-flex items-center gap-1 px-3 py-1 text-green-600 hover:bg-green-50 rounded transition-colors font-medium text-sm"
-    >
-      PDF
     </button>
   </div>
 )
@@ -62,10 +53,6 @@ const CreateInvoice = () => {
   const [checkedEmployees, setCheckedEmployees] = useState(new Set())
   const [employeeInputs, setEmployeeInputs] = useState({})
   const [generatedInvoice, setGeneratedInvoice] = useState(null);
-
-  // TODO
-  const dailyRate = 1000
-  const overtimeRate = 200
 
   const onGridReady = (params) => {
     gridApiRef.current = params.api
@@ -411,35 +398,34 @@ const CreateInvoice = () => {
   }
 
   const handleGeneratePdf = async (id) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/${id}`);
-      if (!res.ok) throw new Error("Failed to fetch invoice details");
-      const apiRes = await res.json(); // depends on API shape
+  setLoading(true);
+  try {
+    const res = await fetch(`${API_URL}/${id}`);
+    if (!res.ok) throw new Error("Failed to fetch invoice details");
+    const apiRes = await res.json();
 
-      // If your API returns { message, invoice } use apiRes.invoice, otherwise adapt
-      const invoiceFromServer = apiRes.invoice || apiRes;
+    const invoiceFromServer = apiRes.invoice;
+    const clientFromServer = apiRes.client;
 
-      // Build a consistent pdfData object (you may need to fetch projects/employees for this invoice too)
-      const pdfData = {
-        invoice: invoiceFromServer,
-        client: clients.find((c) => String(c.id) === String(invoiceFromServer.client_id)) || null,
-        projects: projectsWithEmployees, // if you have to fetch project data for this invoice, call that API
-        employeesRaw: employeeInputs,
-        employeeEntries: [], // if you can fetch employee breakdown, populate here
-        selectedProjects: Array.from(checkedProjects),
-        selectedEmployees: Array.from(checkedEmployees),
-        totalAmount: Number(invoiceFromServer.total_amount || 0),
-      };
+    const pdfData = {
+      invoice: invoiceFromServer,
+      client: clientFromServer, 
+      projects: apiRes.projects || projectsWithEmployees,
+      employeesRaw: apiRes.employeesRaw || employeeInputs,
+      employeeEntries: apiRes.employeeEntries || [],
+      selectedProjects: apiRes.selectedProjects || Array.from(checkedProjects),
+      selectedEmployees: apiRes.selectedEmployees || Array.from(checkedEmployees),
+      totalAmount: apiRes.totalAmount ?? Number(invoiceFromServer.total_amount || 0),
+    };
 
-      setPdfInvoiceData(pdfData);
-      setShowSample(true);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to generate PDF");
-    } finally {
-      setLoading(false);
-    }
-  };
+    setPdfInvoiceData(pdfData);
+    setShowSample(true);
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : "Failed to generate PDF");
+  } finally {
+    setLoading(false);
+  }
+};
 
 
   // toggle project checked
@@ -560,7 +546,7 @@ const CreateInvoice = () => {
     {
       field: "Actions",
       headerName: "Actions",
-      minWidth: 220,
+      minWidth: 100,
       cellRenderer: (params) => (
         <ActionCellRenderer
           data={params.data}
