@@ -21,8 +21,8 @@ import CreateInvoice from "./Pages/CreateInvoice";
 
 export const AppContext = createContext("");
 
-const API_URL = "http://localhost:3000/api/clients";
-// const API_URL = "https://pgsql-invoice.onrender.com/api/clients";
+// const API_URL = "http://localhost:3000/api/clients";
+const API_URL = "https://pgsql-invoice.onrender.com/api/clients";
 function App() {
   const [listData, setListData] = useState([]);
   const [getLaptopId, setGetLaptopId] = useState(null);

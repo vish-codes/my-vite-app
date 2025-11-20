@@ -8,10 +8,10 @@ import GeneratePDF from "./GeneratePDF"
 import LoaderOverlay from "./LoaderOverlay"
 import toast, { Toaster } from "react-hot-toast";
 
-const API_URL = "http://localhost:3000/api/invoices"
-const CLIENT_API_URL = "http://localhost:3000/api/clients"
-// const API_URL = "https://pgsql-invoice.onrender.com/api/invoices";
-// const CLIENT_API_URL = "https://pgsql-invoice.onrender.com/api/clients";
+// const API_URL = "http://localhost:3000/api/invoices"
+// const CLIENT_API_URL = "http://localhost:3000/api/clients"
+const API_URL = "https://pgsql-invoice.onrender.com/api/invoices";
+const CLIENT_API_URL = "https://pgsql-invoice.onrender.com/api/clients";
 
 const emptyForm = {
   invoice_no: "",
@@ -104,7 +104,7 @@ const CreateInvoice = () => {
       toast.error("Error fetching clients")
     }
   }
-// poorvi
+
   // Fetch client details (projects + employees) when a client is selected
   const fetchClientDetails = async (clientId) => {
     if (!clientId) return
