@@ -68,7 +68,7 @@ const ProjectOnboarding = () => {
 
   const fetchClients = async () => {
     try {
-      const res = await fetch(`${PROJECT_URI}/api/clients`);
+      const res = await fetch(`${PROJECT_URI}/clients`);
       if (!res.ok) throw new Error("Failed to fetch clients");
       const data = await res.json();
       setClients(data);
@@ -79,7 +79,7 @@ const ProjectOnboarding = () => {
 
   const fetchEmployees = async () => {
     try {
-      const res = await fetch(`${PROJECT_URI}/api/employee`);
+      const res = await fetch(`${PROJECT_URI}/employee`);
       if (!res.ok) throw new Error("Failed to fetch employees");
       const data = await res.json();
       setEmployees(data);
@@ -91,7 +91,7 @@ const ProjectOnboarding = () => {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${PROJECT_URI}/api/projects`);
+      const res = await fetch(`${PROJECT_URI}/projects`);
       if (!res.ok) throw new Error("Failed to fetch projects");
       const data = await res.json();
       setProjects(data);
@@ -165,7 +165,7 @@ const ProjectOnboarding = () => {
     if (!deleteId) return;
     setLoading(true);
     try {
-      const res = await fetch(`${PROJECT_URI}/api/projects/${deleteId}`, {
+      const res = await fetch(`${PROJECT_URI}/projects/${deleteId}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed to delete project");
@@ -194,8 +194,8 @@ const ProjectOnboarding = () => {
 
       const method = editingProjectId ? "PUT" : "POST";
       const url = editingProjectId
-        ? `${PROJECT_URI}/api/projects/${editingProjectId}`
-        : `${PROJECT_URI}/api/projects`;
+        ? `${PROJECT_URI}/projects/${editingProjectId}`
+        : `${PROJECT_URI}/projects`;
 
       const response = await fetch(url, {
         method,
