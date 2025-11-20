@@ -185,7 +185,7 @@ const ProjectOnboarding = () => {
       const payload = {
         name: formData.name,
         client_id: Number(formData.client_id),
-        emp_id: formData.emp_id.map(Number),
+        emp_ids: formData.emp_id.map(Number),
         billing_amt: Number(formData.billing_amt),
         billing_method: formData.billing_method,
         overtime_amt: formData.overtime_amt ? Number(formData.overtime_amt) : 0,
