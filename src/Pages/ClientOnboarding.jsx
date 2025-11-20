@@ -233,8 +233,8 @@ const ClientOnboarding = () => {
       sortable: true,
     },
     {
-      field: "state",
-      headerName: "State",
+      field: "tax_rate",
+      headerName: "Tax Rate",
       minWidth: 120,
       filter: true,
       floatingFilter: true,
