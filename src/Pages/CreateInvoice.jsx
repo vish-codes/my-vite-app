@@ -104,7 +104,7 @@ const CreateInvoice = () => {
       toast.error("Error fetching clients")
     }
   }
-
+// poorvi
   // Fetch client details (projects + employees) when a client is selected
   const fetchClientDetails = async (clientId) => {
     if (!clientId) return
