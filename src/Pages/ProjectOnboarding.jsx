@@ -9,7 +9,7 @@ import DashboardPdf from "../Components/DashboardPdf";
 import LoaderOverlay from "./LoaderOverlay";
 import toast, { Toaster } from "react-hot-toast";
 
-const PROJECT_URI = "https://pgsql-invoice.onrender.com";
+const PROJECT_URI = import.meta.env.VITE_STATE === "DEV" ? `${import.meta.env.VITE_BASE_URL_DEV}` : `${import.meta.env.VITE_BASE_URL_PROD}`;
 
 const emptyForm = {
   name: "",

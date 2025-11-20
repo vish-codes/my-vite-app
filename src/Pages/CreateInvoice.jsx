@@ -10,8 +10,10 @@ import toast, { Toaster } from "react-hot-toast";
 
 // const API_URL = "http://localhost:3000/api/invoices"
 // const CLIENT_API_URL = "http://localhost:3000/api/clients"
-const API_URL = "https://pgsql-invoice.onrender.com/api/invoices";
-const CLIENT_API_URL = "https://pgsql-invoice.onrender.com/api/clients";
+
+const API_URL = import.meta.env.VITE_STATE === "DEV" ? `${import.meta.env.VITE_BASE_URL_DEV}/invoices` : `${import.meta.env.VITE_BASE_URL_PROD}/invoices`;
+
+const CLIENT_API_URL = import.meta.env.VITE_STATE === "DEV" ? `${import.meta.env.VITE_BASE_URL_DEV}/clients` : `${import.meta.env.VITE_BASE_URL_PROD}/clients`;
 
 const emptyForm = {
   invoice_no: "",

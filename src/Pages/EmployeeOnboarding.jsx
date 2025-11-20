@@ -7,7 +7,7 @@ import DashboardPdf from "../Components/DashboardPdf"
 import LoaderOverlay from "./LoaderOverlay"
 import toast, { Toaster } from "react-hot-toast"
 
-const API_URL = "https://pgsql-invoice.onrender.com/api/employee"
+const API_URL = import.meta.env.VITE_STATE === "DEV" ? `${import.meta.env.VITE_BASE_URL_DEV}/employee` : `${import.meta.env.VITE_BASE_URL_PROD}/employee`;
 
 const emptyForm = {
   name: "",

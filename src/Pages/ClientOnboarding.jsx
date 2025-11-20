@@ -9,7 +9,7 @@ import DashboardPdf from "../Components/DashboardPdf";
 import LoaderOverlay from "./LoaderOverlay";
 import toast, { Toaster } from "react-hot-toast";
 
-const API_URL = "https://pgsql-invoice.onrender.com/api/clients";
+const API_URL = import.meta.env.VITE_STATE === "DEV" ? `${import.meta.env.VITE_BASE_URL_DEV}/clients` : `${import.meta.env.VITE_BASE_URL_PROD}/clients`;
 
 const emptyForm = {
   name: "",
@@ -18,6 +18,7 @@ const emptyForm = {
   gst_number: "",
   company_name: "",
 };
+console.log('process====>', import.meta.env.VITE_STATE);
 
 const companyOptions = [
   { id: 1, name: "Panorama Software Solutions" },
