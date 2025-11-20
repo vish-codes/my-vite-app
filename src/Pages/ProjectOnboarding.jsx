@@ -234,15 +234,13 @@ const ProjectOnboarding = () => {
         clients.find((c) => c.id === params.data.client_id)?.name || "-",
     },
     {
-      field: "emp_id",
+      field: "employees",
       headerName: "Employees",
       minWidth: 200,
       valueGetter: (params) => {
-        return (
-          params.data.emp_id
-            ?.map((id) => employees.find((e) => e.id === id)?.name)
-            .join(", ") || "-"
-        );
+        return params.data.employees
+          ?.map((emp) => emp.emp_name)
+          .join(", ") || "-";
       },
     },
     { field: "billing_amt", headerName: "Billing Amount", minWidth: 120 },
@@ -371,11 +369,10 @@ const ProjectOnboarding = () => {
                     value={formData.name}
                     onChange={handleChange}
                     placeholder="Enter project name"
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                      validationErrors.name
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${validationErrors.name
                         ? "border-red-500 bg-red-50"
                         : "border-slate-300 bg-white"
-                    }`}
+                      }`}
                   />
                   {validationErrors.name && (
                     <p className="text-red-600 text-sm mt-1">
@@ -394,11 +391,10 @@ const ProjectOnboarding = () => {
                       name="client_id"
                       value={formData.client_id}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.client_id
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${validationErrors.client_id
                           ? "border-red-500 bg-red-50"
                           : "border-slate-300 bg-white"
-                      }`}
+                        }`}
                     >
                       <option value="">Select Client</option>
                       {clients.map((client) => (
@@ -423,27 +419,25 @@ const ProjectOnboarding = () => {
                       {/* Trigger Box */}
                       <div
                         onClick={() => setOpenEmployeeDropdown((prev) => !prev)}
-                        className={`w-full px-3 py-2 border rounded-lg bg-white cursor-pointer flex items-center justify-between ${
-                          validationErrors.emp_id
+                        className={`w-full px-3 py-2 border rounded-lg bg-white cursor-pointer flex items-center justify-between ${validationErrors.emp_id
                             ? "border-red-500 bg-red-50"
                             : "border-slate-300"
-                        }`}
+                          }`}
                       >
                         <span className="truncate">
                           {formData.emp_id.length === 0
                             ? "Select employees"
                             : employees
-                                .filter((emp) =>
-                                  formData.emp_id.includes(emp.id)
-                                )
-                                .map((emp) => emp.name)
-                                .join(", ")}
+                              .filter((emp) =>
+                                formData.emp_id.includes(emp.id)
+                              )
+                              .map((emp) => emp.name)
+                              .join(", ")}
                         </span>
 
                         <svg
-                          className={`w-4 h-4 transition-transform ${
-                            openEmployeeDropdown ? "rotate-180" : ""
-                          }`}
+                          className={`w-4 h-4 transition-transform ${openEmployeeDropdown ? "rotate-180" : ""
+                            }`}
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -473,8 +467,8 @@ const ProjectOnboarding = () => {
                                     emp.id
                                   )
                                     ? formData.emp_id.filter(
-                                        (id) => id !== emp.id
-                                      )
+                                      (id) => id !== emp.id
+                                    )
                                     : [...formData.emp_id, emp.id];
 
                                   setFormData({ ...formData, emp_id: updated });
@@ -518,11 +512,10 @@ const ProjectOnboarding = () => {
                       value={formData.billing_amt}
                       onChange={handleChange}
                       placeholder="Enter billing amount"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.billing_amt
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${validationErrors.billing_amt
                           ? "border-red-500 bg-red-50"
                           : "border-slate-300 bg-white"
-                      }`}
+                        }`}
                     />
                     {validationErrors.billing_amt && (
                       <p className="text-red-600 text-sm mt-1">
@@ -677,9 +670,8 @@ const ProjectOnboarding = () => {
                       Status
                     </p>
                     <p
-                      className={`text-lg font-semibold ${
-                        formData.active ? "text-green-600" : "text-red-600"
-                      }`}
+                      className={`text-lg font-semibold ${formData.active ? "text-green-600" : "text-red-600"
+                        }`}
                     >
                       {formData.active ? "Active" : "Inactive"}
                     </p>
@@ -702,8 +694,8 @@ const ProjectOnboarding = () => {
                   {loading
                     ? "Submitting..."
                     : editingProjectId
-                    ? "Update"
-                    : "Submit"}
+                      ? "Update"
+                      : "Submit"}
                 </button>
               </div>
             </div>
