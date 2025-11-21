@@ -57,7 +57,7 @@ const DashboardPdf = () => {
                         />
                         <DropdownItem
                           to="/genpdf/create-invoice"
-                          label="Create Invoice"
+                          label="Generate Invoice"
                         />
                       </div>
                     </div>
