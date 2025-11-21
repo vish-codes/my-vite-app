@@ -9,16 +9,18 @@ import DashboardPdf from "../Components/DashboardPdf";
 import LoaderOverlay from "./LoaderOverlay";
 import toast, { Toaster } from "react-hot-toast";
 
-const API_URL = import.meta.env.VITE_STATE === "DEV" ? `${import.meta.env.VITE_BASE_URL_DEV}/clients` : `${import.meta.env.VITE_BASE_URL_PROD}/clients`;
+const API_URL =
+  import.meta.env.VITE_STATE === "DEV"
+    ? `${import.meta.env.VITE_BASE_URL_DEV}/clients`
+    : `${import.meta.env.VITE_BASE_URL_PROD}/clients`;
 
 const emptyForm = {
   name: "",
   address: "",
-  state: "",
+  tax_rate: "",
   gst_number: "",
-  company_name: "",
+  company_id: "",
 };
-console.log('process====>', import.meta.env.VITE_STATE);
 
 const companyOptions = [
   { id: 1, name: "Panorama Software Solutions" },
@@ -52,12 +54,28 @@ const ClientOnboarding = () => {
   const [deleteId, setDeleteId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [validationErrors, setValidationErrors] = useState({});
+  const [companyOptions, setCompanyOptions] = useState([]);
   const gridApiRef = useRef(null);
 
   useEffect(() => {
+    fetchCompanies();
     fetchClients();
   }, []);
 
+  const fetchCompanies = async () => {
+    try {
+      const res = await fetch(
+        import.meta.env.VITE_STATE === "DEV"
+          ? `${import.meta.env.VITE_BASE_URL_DEV}/companies`
+          : `${import.meta.env.VITE_BASE_URL_PROD}/companies`
+      );
+
+      const data = await res.json();
+      setCompanyOptions(data.companies);
+    } catch (err) {
+      console.error("Error fetching companies:", err);
+    }
+  };
   const onGridReady = (params) => {
     gridApiRef.current = params.api;
     params.api.sizeColumnsToFit();
@@ -84,11 +102,12 @@ const ClientOnboarding = () => {
     const errors = {};
     if (!formData.name.trim()) errors.name = "Client name is required";
     if (!formData.address.trim()) errors.address = "Address is required";
-    if (!formData.state.trim()) errors.state = "State is required";
-    if (!formData.company_name.trim())
-      errors.company_name = "Company Name is required";
-    if (!formData.gst_number.trim())
+    if (!formData.tax_rate.trim()) errors.tax_rate = "Tax rate is required";
+    if (!formData.company_id.trim())
+      errors.company_id = "Company Name is required";
+    if (formData.tax_rate !== "N/A" && !formData.gst_number.trim()) {
       errors.gst_number = "GST Number is required";
+    }
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -113,9 +132,8 @@ const ClientOnboarding = () => {
       setFormData({
         name: data.name || "",
         address: data.address || "",
-        state: data.state || "",
+        tax_rate: data.tax_rate || "",
         gst_number: data.gst_number || "",
-        company_name: data.company_name || "",
         company_id: data.company_id || "",
       });
 
@@ -161,7 +179,7 @@ const ClientOnboarding = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-
+      console.log("res", res);
       if (!res.ok) throw new Error("Failed to save client");
 
       await fetchClients();
@@ -203,9 +221,20 @@ const ClientOnboarding = () => {
   const filteredClients = clients.filter(
     (client) =>
       client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.company_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.state.toLowerCase().includes(searchQuery.toLowerCase())
+      client.company_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.tax_rate.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const getCompanyName = (id) => {
+    const company = companyOptions.find((c) => c.id == id);
+    return company ? company.name : "N/A";
+  };
+
+  useEffect(() => {
+    if (formData.tax_rate === "N/A") {
+      setFormData((prev) => ({ ...prev, gst_number: "" }));
+    }
+  }, [formData.tax_rate]);
 
   const columnDefs = [
     {
@@ -217,12 +246,13 @@ const ClientOnboarding = () => {
       sortable: true,
     },
     {
-      field: "company_name",
+      field: "company_id",
       headerName: "Company Name",
-      minWidth: 130,
+      minWidth: 150,
       filter: true,
       floatingFilter: true,
       sortable: true,
+      valueGetter: (params) => getCompanyName(params.data.company_id),
     },
     {
       field: "address",
@@ -338,24 +368,26 @@ const ClientOnboarding = () => {
                       Company Name <span className="text-red-600">*</span>
                     </label>
                     <select
-                      name="company_name"
-                      value={formData.company_name}
+                      name="company_id"
+                      value={formData.company_id || ""}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.company_name
+                      className={`w-full px-3 py-2 border rounded-lg ${
+                        validationErrors.company_id
                           ? "border-red-500 bg-red-50"
                           : "border-slate-300 bg-white"
                       }`}
                     >
+                      <option value="">Select a company</option>
+
                       {companyOptions.map((company) => (
-                        <option key={company.id} value={company.name}>
+                        <option key={company.id} value={company.id}>
                           {company.name}
                         </option>
                       ))}
                     </select>
-                    {validationErrors.company_name && (
+                    {validationErrors.company_id && (
                       <p className="text-red-600 text-sm mt-1">
-                        {validationErrors.company_name}
+                        {validationErrors.company_id}
                       </p>
                     )}
                   </div>
@@ -384,26 +416,31 @@ const ClientOnboarding = () => {
                     )}
                   </div>
 
-                  {/* State */}
+                  {/* ----------------- */}
                   <div>
                     <label className="block text-sm font-medium text-slate-900 mb-2">
-                      State <span className="text-red-600">*</span>
+                      Tax rate <span className="text-red-600">*</span>
                     </label>
-                    <input
-                      type="text"
-                      name="state"
-                      value={formData.state}
+
+                    <select
+                      name="tax_rate"
+                      value={formData.tax_rate}
                       onChange={handleChange}
-                      placeholder="Enter state"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.state
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring   -blue-500 transition ${
+                        validationErrors.tax_rate
                           ? "border-red-500 bg-red-50"
                           : "border-slate-300 bg-white"
                       }`}
-                    />
-                    {validationErrors.state && (
+                    >
+                      <option value="">Select GST value</option>
+                      <option value="9% + 9%">9% + 9%</option>
+                      <option value="18%">18%</option>
+                      <option value="N/A">N/A</option>
+                    </select>
+
+                    {validationErrors.tax_rate && (
                       <p className="text-red-600 text-sm mt-1">
-                        {validationErrors.state}
+                        {validationErrors.tax_rate}
                       </p>
                     )}
                   </div>
@@ -419,10 +456,16 @@ const ClientOnboarding = () => {
                       value={formData.gst_number}
                       onChange={handleChange}
                       placeholder="Enter GST Number"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.gst_number
+                      disabled={formData.tax_rate === "N/A"}
+                      className={`w-full px-3 py-2 border rounded-lg ${
+                        formData.tax_rate === "N/A"
+                          ? "bg-slate-100 cursor-not-allowed"
+                          : "focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      } ${
+                        validationErrors.gst_number &&
+                        formData.tax_rate !== "N/A"
                           ? "border-red-500 bg-red-50"
-                          : "border-slate-300 bg-white"
+                          : "border-slate-300"
                       }`}
                     />
                     {validationErrors.gst_number && (
@@ -486,7 +529,7 @@ const ClientOnboarding = () => {
                       Company Name
                     </p>
                     <p className="text-lg font-semibold text-slate-900">
-                      {formData.company_name}
+                      {getCompanyName(formData.company_id)}
                     </p>
                   </div>
                   <div>
@@ -499,10 +542,10 @@ const ClientOnboarding = () => {
                   </div>
                   <div>
                     <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
-                      State
+                      Tax rate
                     </p>
                     <p className="text-lg font-semibold text-slate-900">
-                      {formData.state}
+                      {formData.tax_rate}
                     </p>
                   </div>
                   <div className="md:col-span-2">
