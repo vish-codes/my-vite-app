@@ -32,14 +32,13 @@ function App() {
 
   // GET data ------------------------------------ //
   useEffect(() => {
-      async function fetchClients() {
+    async function fetchClients() {
       setIsLoading(true);
-      setError("");
       try {
         const res = await fetch(API_URL);
         if (!res.ok) throw new Error("Failed to fetch clients");
-        await res.json();
-        setIsLoading(false);
+        const clientData = await res.json();
+        setListData(clientData);
       } catch (err) {
         console.error(err.message);
       } finally {
@@ -197,7 +196,10 @@ function App() {
         getLaptopIdsForHistory,
       }}
     >
-      <BrowserRouter>
+      <BrowserRouter future={{
+        v7_relativeSplatPath: true,
+        v7_startTransition: true
+      }}>
         <Routes>
           <Route index element={<Landing />} />
           <Route path="/login" element={<Login />} />
