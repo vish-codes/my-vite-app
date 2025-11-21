@@ -11,7 +11,7 @@ import toast, { Toaster } from "react-hot-toast";
 const API_URL = import.meta.env.VITE_STATE === "DEV" ? `${import.meta.env.VITE_BASE_URL_DEV}/invoices` : `${import.meta.env.VITE_BASE_URL_PROD}/invoices`;
 
 const CLIENT_API_URL = import.meta.env.VITE_STATE === "DEV" ? `${import.meta.env.VITE_BASE_URL_DEV}/clients` : `${import.meta.env.VITE_BASE_URL_PROD}/clients`;
-
+const COMPANY_URL= import.meta.env.VITE_STATE === "DEV" ? `${import.meta.env.VITE_BASE_URL_DEV}/invoices` : `${import.meta.env.VITE_BASE_URL_PROD}/companies`;
 const emptyForm = {
   invoice_no: "",
   client_id: "",
@@ -291,93 +291,95 @@ const CreateInvoice = () => {
   }
 
   const handleFinalSubmit = async () => {
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      // 1 - collect project ids
-      const project_ids = Array.from(checkedProjects);
+  try {
+    // 1 - collect project ids
+    const project_ids = Array.from(checkedProjects);
 
-      // 2 - build employee_entries
-      const employee_entries = [];
-      Object.keys(employeeInputs).forEach((eid) => {
-        const idNum = Number(eid);
-        if (checkedEmployees.has(idNum)) {
-          const vals = employeeInputs[eid] || {};
-          employee_entries.push({
-            employee_id: idNum,
-            days: Number(vals.days || 0),
-            paid_leaves: Number(vals.paid_leaves || 0),
-            unpaid_leaves: Number(vals.unpaid_leaves || 0),
-            over_time: Number(vals.over_time || 0),
-            overtime_rate: Number(vals.overtime_rate || 0),
-          });
-        }
-      });
-
-      // 3 - compute total
-      const totalAmount = computePreviewTotal();
-
-      // 4 - payload
-      const payload = {
-        ...formData,
-        project_ids,
-        employees: employee_entries,
-        total_amount: totalAmount,
-      };
-
-      // 5 - call API
-      const res = await fetch(editingId ? `${API_URL}/${editingId}` : API_URL, {
-        method: editingId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || "Failed to save invoice");
+    // 2 - build employee_entries
+    const employee_entries = [];
+    Object.keys(employeeInputs).forEach((eid) => {
+      const idNum = Number(eid);
+      if (checkedEmployees.has(idNum)) {
+        const vals = employeeInputs[eid] || {};
+        employee_entries.push({
+          employee_id: idNum,
+          days: Number(vals.days || 0),
+          paid_leaves: Number(vals.paid_leaves || 0),
+          unpaid_leaves: Number(vals.unpaid_leaves || 0),
+          over_time: Number(vals.over_time || 0),
+          overtime_rate: Number(vals.overtime_rate || 0),
+        });
       }
+    });
 
-      const result = await res.json();
-      // store server invoice cleanly
-      setGeneratedInvoice(result.invoice); // optional, if you still need it
+    // 3 - compute total
+    const totalAmount = computePreviewTotal();
 
-      // build unified pdf data shape
-      const pdfData = {
-        invoice: result.invoice,
-        client: clients.find((c) => String(c.id) === String(formData.client_id)) || null,
-        projects: projectsWithEmployees,
-        employeesRaw: employeeInputs,
-        employeeEntries: employee_entries,
-        selectedProjects: Array.from(checkedProjects),
-        selectedEmployees: Array.from(checkedEmployees),
-        totalAmount,
-      };
+    // 4 - payload
+    const payload = {
+      ...formData,
+      project_ids,
+      employees: employee_entries,
+      total_amount: totalAmount,
+    };
 
-      // set pdf state and show PDF (do NOT call resetAllViews here)
-      setPdfInvoiceData(pdfData);
-      setShowSample(true);
-      setShowForm(false);
-      setShowPreview(false);
-      toast.success(editingId ? "Invoice updated!" : "Invoice created!");
+    // 5 - Create or Update Invoice
+    const res = await fetch(editingId ? `${API_URL}/${editingId}` : API_URL, {
+      method: editingId ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-      // OPTIONAL: clear the form fields but keep pdfInvoiceData/showSample intact
-      setFormData(emptyForm);
-      setEditingId(null);
-      setProjectsWithEmployees([]);
-      setCheckedProjects(new Set());
-      setCheckedEmployees(new Set());
-      setEmployeeInputs({});
-
-      // reload invoices list (if you want)
-      if (fetchInvoices) fetchInvoices();
-    } catch (err) {
-      toast.error(err?.message || "Failed to create invoice");
-    } finally {
-      setLoading(false);
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(txt || "Failed to save invoice");
     }
-  };
 
+    const result = await res.json();
+    const savedInvoice = result.invoice;
+    const companyId = savedInvoice.company_id;
+    console.log('temp', clients.find((c) => String(c.id) === String(formData.client_id)) || null)
+    const comp_id = clients.find((c) => String(c.id) === String(formData.client_id)) || null
+    const companyRes = await fetch(`${COMPANY_URL}/${comp_id.company_id}`);
+    if (!companyRes.ok) throw new Error("Failed to fetch company details");
 
+    const companyDetails = await companyRes.json();
+
+    const pdfData = {
+      invoice: savedInvoice,
+      client: clients.find((c) => String(c.id) === String(formData.client_id)) || null,
+      company: companyDetails.company,        // <-- NEW (instead of client)
+      projects: projectsWithEmployees,
+      employeesRaw: employeeInputs,
+      employeeEntries: employee_entries,
+      selectedProjects: Array.from(checkedProjects),
+      selectedEmployees: Array.from(checkedEmployees),
+      totalAmount,
+    };
+
+    setPdfInvoiceData(pdfData);
+    setShowSample(true);
+    setShowForm(false);
+    setShowPreview(false);
+    toast.success(editingId ? "Invoice updated!" : "Invoice created!");
+
+    // Clear the form
+    setFormData(emptyForm);
+    setEditingId(null);
+    setProjectsWithEmployees([]);
+    setCheckedProjects(new Set());
+    setCheckedEmployees(new Set());
+    setEmployeeInputs({});
+
+    if (fetchInvoices) fetchInvoices();
+  } catch (err) {
+    toast.error(err?.message || "Failed to create invoice");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDelete = (id) => setDeleteId(id)
 

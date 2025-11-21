@@ -29,14 +29,14 @@ const commonDataForPdf = {
     ? new Date(invoiceData.invoice.issue_date).toLocaleDateString()
     : "N/A",
   // COMPANY DETAILS (from backend)
-  companyName: invoiceData?.client?.company_name || "N/A",
-  companyAddress: invoiceData?.client?.company_address || "N/A",
-  companyState: invoiceData?.client?.company_state || "N/A",
-  companyGst: invoiceData?.client?.company_gst_number || "N/A",
-  companyPan: invoiceData?.client?.company_pan || "N/A",
+  companyName: invoiceData?.company?.name || "N/A",
+  companyAddress: invoiceData?.company?.address || "N/A",
+  companyState: invoiceData?.company?.state || "N/A",
+  companyGst: invoiceData?.company?.gst_number || "N/A",
+  companyPan: invoiceData?.company?.pan || "N/A",
   companyAccountNumber:
-    invoiceData?.client?.company_bank_account_number || "N/A",
-  companyIfscCode: invoiceData?.client?.company_ifsc_code || "N/A",
+    invoiceData?.company?.bank_account_number || "N/A",
+  companyIfscCode: invoiceData?.company?.ifsc_code || "N/A",
   // CLIENT DETAILS
   clientName: invoiceData?.client?.name || "N/A",
   clientAddress: invoiceData?.client?.address || "N/A",
