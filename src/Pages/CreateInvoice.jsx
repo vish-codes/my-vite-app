@@ -7,6 +7,7 @@ import DashboardPdf from "../Components/DashboardPdf"
 import GeneratePDF from "./GeneratePDF"
 import LoaderOverlay from "./LoaderOverlay"
 import toast, { Toaster } from "react-hot-toast";
+import { Trash } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_STATE === "DEV" ? `${import.meta.env.VITE_BASE_URL_DEV}/invoices` : `${import.meta.env.VITE_BASE_URL_PROD}/invoices`;
 
@@ -18,7 +19,8 @@ const emptyForm = {
   issue_date: "",
   billing_from: "",
   billing_to: "",
-
+  remark_days: "",
+  remark_overtime: "",
 }
 
 const ActionCellRenderer = ({ data, onEdit, onDelete }) => (
@@ -29,14 +31,12 @@ const ActionCellRenderer = ({ data, onEdit, onDelete }) => (
     >
       Edit
     </button>
-    <button
-      onClick={() => onDelete(data.id)}
-      className="inline-flex items-center gap-1 px-3 py-1 text-red-600 hover:bg-red-50 rounded transition-colors font-medium text-sm"
-    >
-      Delete
-    </button>
+    <Trash
+      onClick={() => onDelete(data.invoice_id)}
+      className="cursor-pointer text-red-500"
+    />
   </div>
-)
+);
 
 const CreateInvoice = () => {
   const [invoices, setInvoices] = useState([])
@@ -55,7 +55,9 @@ const CreateInvoice = () => {
   const [checkedProjects, setCheckedProjects] = useState(new Set())
   const [checkedEmployees, setCheckedEmployees] = useState(new Set())
   const [employeeInputs, setEmployeeInputs] = useState({})
-  const [generatedInvoice, setGeneratedInvoice] = useState(null);
+  // const [generatedInvoice, setGeneratedInvoice] = useState(null);
+  // const [deleteId, setDeleteId] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const onGridReady = (params) => {
     gridApiRef.current = params.api
@@ -105,8 +107,8 @@ const CreateInvoice = () => {
       const res = await fetch(`${CLIENT_API_URL}/${clientId}/details`)
       if (!res.ok) throw new Error("Failed to fetch client details")
       const data = await res.json()
-      let normalized = []
 
+      let normalized = []
       if (Array.isArray(data.projectsWithEmployees)) {
         normalized = data.projectsWithEmployees.map((p) => ({
           id: p.id,
@@ -158,16 +160,17 @@ const CreateInvoice = () => {
             map.get(pid).employees.push({
               id: row.employee_id,
               name: row.employee_name,
+              project_emp_code: row.project_emp_code,
+              billing_amt: row.billing_amt,
+              billing_method: row.billing_method,
+              overtime_amt: row.overtime_amt,
             });
           }
+
         });
 
         normalized = Array.from(map.values());
       }
-
-      // ----------------------------------------
-      // Save to state
-      // ----------------------------------------
       setProjectsWithEmployees(normalized);
 
       // Auto-select all projects
@@ -189,7 +192,6 @@ const CreateInvoice = () => {
           };
         });
       });
-
       setCheckedProjects(projSet);
       setCheckedEmployees(empSet);
       setEmployeeInputs(inputs);
@@ -239,15 +241,15 @@ const CreateInvoice = () => {
       return;
     }
 
-    console.log("📌 Editing invoice:", invoice);
-
     setFormData({
-  invoice_no: invoice.invoice_no || "",
-  client_id: invoice.client_id?.toString?.() || "",
-  issue_date: invoice.issue_date ? invoice.issue_date.slice(0, 10) : "",
-  billing_from: invoice.billing_from? invoice.billing_from.slice(0, 10): "",
-  billing_to: invoice.billing_to? invoice.billing_to.slice(0, 10): "",
-});
+      invoice_no: invoice.invoice_no || "",
+      client_id: invoice.client_id?.toString?.() || "",
+      issue_date: invoice.issue_date ? invoice.issue_date.slice(0, 10) : "",
+      billing_from: invoice.billing_from ? invoice.billing_from.slice(0, 10) : "",
+      billing_to: invoice.billing_to ? invoice.billing_to.slice(0, 10) : "",
+      remark_days: invoice.remark_days || "",
+      remark_overtime: invoice.remark_overtime || "",
+    });
 
 
     const id =
@@ -311,14 +313,30 @@ const CreateInvoice = () => {
         const idNum = Number(eid);
         if (checkedEmployees.has(idNum)) {
           const vals = employeeInputs[eid] || {};
+          // Find employee full data from normalized projects
+          let empFullData = null;
+          projectsWithEmployees.forEach((p) => {
+            p.employees.forEach((e) => {
+              if (e.id === idNum) empFullData = e;
+            });
+          });
+
           employee_entries.push({
             employee_id: idNum,
+            project_emp_code: empFullData?.project_emp_code || null,
+            billing_amt: empFullData?.billing_amt || 0,
+            billing_method: empFullData?.billing_method || null,
+            overtime_amt: empFullData?.overtime_amt || 0,
+
             days: Number(vals.days || 0),
             paid_leaves: Number(vals.paid_leaves || 0),
             unpaid_leaves: Number(vals.unpaid_leaves || 0),
             over_time: Number(vals.over_time || 0),
             overtime_rate: Number(vals.overtime_rate || 0),
+            remark_days: String(vals.remark_days || ""),
+            remark_overtime: String(vals.remark_overtime || ""),
           });
+
         }
       });
 
@@ -332,7 +350,6 @@ const CreateInvoice = () => {
         employees: employee_entries,
         total_amount: totalAmount,
       };
-      console.log("formData ",payload);
 
       // 5 - Create or Update Invoice
       const res = await fetch(editingId ? `${API_URL}/${editingId}` : API_URL, {
@@ -352,15 +369,15 @@ const CreateInvoice = () => {
       const comp_id = clients.find((c) => String(c.id) === String(formData.client_id)) || null
       const companyRes = await fetch(`${COMPANY_URL}/${comp_id.company_id}`);
       if (!companyRes.ok) throw new Error("Failed to fetch company details");
-      
+
       const companyDetails = await companyRes.json();
-      
+
       const pdfData = {
         invoice: savedInvoice,
-        billingFrom:formData.billing_from,
-        billingTo:formData.billing_to,
+        billingFrom: formData.billing_from,
+        billingTo: formData.billing_to,
         client: clients.find((c) => String(c.id) === String(formData.client_id)) || null,
-        company: companyDetails.company,  
+        company: companyDetails.company,
         projects: projectsWithEmployees,
         employeesRaw: employeeInputs,
         employeeEntries: employee_entries,
@@ -368,7 +385,6 @@ const CreateInvoice = () => {
         selectedEmployees: Array.from(checkedEmployees),
         totalAmount,
       };
-      console.log('temp', pdfData);
 
       setPdfInvoiceData(pdfData);
       setShowSample(true);
@@ -392,23 +408,33 @@ const CreateInvoice = () => {
     }
   };
 
-  const handleDelete = (id) => setDeleteId(id)
+  const handleDelete = (id) => {
+    setDeleteId(id);
+    setShowDeleteModal(true);
+  };
 
   const confirmDelete = async () => {
-    if (!deleteId) return
-    setLoading(true)
+    if (!deleteId) return;
+    setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/${deleteId}`, { method: "DELETE" })
-      if (!res.ok) throw new Error("Failed to delete invoice")
-      await fetchInvoices()
-      setDeleteId(null)
-      toast.success("Invoice deleted successfully!")
+      const res = await fetch(`${API_URL}/${deleteId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete invoice");
+      toast.success("Invoice deleted successfully!");
+      await fetchInvoices(); // refresh table
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete invoice")
+      toast.error(err instanceof Error ? err.message : "Failed to delete invoice");
     } finally {
-      setLoading(false)
+      setDeleteId(null);
+      setShowDeleteModal(false);
+      setLoading(false);
     }
-  }
+  };
+
+  const cancelDelete = () => {
+    setDeleteId(null);
+    setShowDeleteModal(false);
+  };
+
 
   const handleGeneratePdf = async (id) => {
     setLoading(true);
@@ -546,6 +572,14 @@ const CreateInvoice = () => {
       floatingFilter: true,
       sortable: true,
       resizable: true,
+      valueFormatter: (params) => {
+        if (!params.value) return "";
+        const d = new Date(params.value);
+        const day = String(d.getDate()).padStart(2, "0");
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const year = d.getFullYear();
+        return `${day}-${month}-${year}`;
+      },
     },
     {
       field: "total_amount",
@@ -653,53 +687,53 @@ const CreateInvoice = () => {
                 </div>
 
                 {/* Issue Date + Billing From + Billing To */}
-<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-  
-  {/* Issue Date */}
-  <div>
-    <label className="block text-sm font-medium text-slate-900 mb-2">Issue Date</label>
-    <input
-      type="date"
-      name="issue_date"
-      value={formData.issue_date}
-      onChange={handleChange}
-      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-    />
-    {validationErrors.issue_date && (
-      <p className="text-red-600 text-sm mt-1">{validationErrors.issue_date}</p>
-    )}
-  </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-  {/* Billing From */}
-  <div>
-    <label className="block text-sm font-medium text-slate-900 mb-2">Billing From</label>
-    <input
-      type="date"
-      name="billing_from"
-      value={formData.billing_from}
-      onChange={handleChange}
-      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-    />
-    {validationErrors.billing_from && (
-      <p className="text-red-600 text-sm mt-1">{validationErrors.billing_from}</p>
-    )}
-  </div>
+                  {/* Issue Date */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">Issue Date</label>
+                    <input
+                      type="date"
+                      name="issue_date"
+                      value={formData.issue_date}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    />
+                    {validationErrors.issue_date && (
+                      <p className="text-red-600 text-sm mt-1">{validationErrors.issue_date}</p>
+                    )}
+                  </div>
 
-  {/* Billing To */}
-  <div>
-    <label className="block text-sm font-medium text-slate-900 mb-2">Billing To</label>
-    <input
-      type="date"
-      name="billing_to"
-      value={formData.billing_to}
-      onChange={handleChange}
-      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-    />
-    {validationErrors.billing_to && (
-      <p className="text-red-600 text-sm mt-1">{validationErrors.billing_to}</p>
-    )}
-  </div>
-</div>
+                  {/* Billing From */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">Billing From</label>
+                    <input
+                      type="date"
+                      name="billing_from"
+                      value={formData.billing_from}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    />
+                    {validationErrors.billing_from && (
+                      <p className="text-red-600 text-sm mt-1">{validationErrors.billing_from}</p>
+                    )}
+                  </div>
+
+                  {/* Billing To */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 mb-2">Billing To</label>
+                    <input
+                      type="date"
+                      name="billing_to"
+                      value={formData.billing_to}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    />
+                    {validationErrors.billing_to && (
+                      <p className="text-red-600 text-sm mt-1">{validationErrors.billing_to}</p>
+                    )}
+                  </div>
+                </div>
 
 
                 {/* Projects & Employees nested UI */}
@@ -735,40 +769,106 @@ const CreateInvoice = () => {
                                         type="checkbox"
                                         checked={checkedEmployees.has(empId)}
                                         onChange={() => toggleEmployee(empId)}
-                                        className="h-4 w-4 accent-green-600"
+                                        className="h-4 w-4 accent-blue-600"
                                       />
                                       <div className="text-sm font-medium text-slate-900">{emp.name}</div>
                                     </div>
 
                                     <div className="col-span-9 grid grid-cols-4 gap-2">
-                                      <input
-                                        type="number"
-                                        placeholder="Days"
-                                        value={empVals.days}
-                                        onChange={(e) => handleEmployeeInputChange(empId, "days", e.target.value)}
-                                        className="w-full px-2 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                      />
-                                      <input
-                                        type="number"
-                                        placeholder="Paid Leaves"
-                                        value={empVals.paid_leaves}
-                                        onChange={(e) => handleEmployeeInputChange(empId, "paid_leaves", e.target.value)}
-                                        className="w-full px-2 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                      />
-                                      <input
-                                        type="number"
-                                        placeholder="Unpaid Leaves"
-                                        value={empVals.unpaid_leaves}
-                                        onChange={(e) => handleEmployeeInputChange(empId, "unpaid_leaves", e.target.value)}
-                                        className="w-full px-2 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                      />
-                                      <input
-                                        type="number"
-                                        placeholder="Overtime"
-                                        value={empVals.over_time}
-                                        onChange={(e) => handleEmployeeInputChange(empId, "over_time", e.target.value)}
-                                        className="w-full px-2 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                      />
+
+                                      {/* ⭐ Working Days + Remark */}
+                                      <div className="flex flex-col">
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          placeholder="Working Days"
+                                          value={empVals.days}
+                                          onChange={(e) => {
+                                            const value = e.target.value;
+                                            handleEmployeeInputChange(empId, "days", value);
+
+                                            if (value === "") {
+                                              handleEmployeeInputChange(empId, "remark_days", "");
+                                            }
+                                          }}
+                                          className="w-full px-2 py-2 border border-slate-200 rounded-md 
+                   focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                        />
+
+                                        {empVals.days !== "" && (
+                                          <input
+                                            type="text"
+                                            placeholder="Remark"
+                                            value={empVals.remark_days}
+                                            onChange={(e) =>
+                                              handleEmployeeInputChange(empId, "remark_days", e.target.value)
+                                            }
+                                            className="w-full mt-2 px-2 py-2 border border-slate-200 rounded-md 
+                     focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                          />
+                                        )}
+                                      </div>
+
+                                      {/* ⭐ Paid Leaves */}
+                                      <div>
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          placeholder="Paid Leaves"
+                                          value={empVals.paid_leaves}
+                                          onChange={(e) =>
+                                            handleEmployeeInputChange(empId, "paid_leaves", e.target.value)
+                                          }
+                                          className="w-full px-2 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                        />
+                                      </div>
+
+                                      {/* ⭐ Unpaid Leaves */}
+                                      <div>
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          placeholder="Unpaid Leaves"
+                                          value={empVals.unpaid_leaves}
+                                          onChange={(e) =>
+                                            handleEmployeeInputChange(empId, "unpaid_leaves", e.target.value)
+                                          }
+                                          className="w-full px-2 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                        />
+                                      </div>
+
+                                      {/* ⭐ Overtime + Remark */}
+                                      <div className="flex flex-col">
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          placeholder="Overtime"
+                                          value={empVals.over_time}
+                                          onChange={(e) => {
+                                            const value = e.target.value;
+                                            handleEmployeeInputChange(empId, "over_time", value);
+
+                                            if (value === "") {
+                                              handleEmployeeInputChange(empId, "remark_overtime", "");
+                                            }
+                                          }}
+                                          className="w-full px-2 py-2 border border-slate-200 rounded-md 
+                   focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                        />
+
+                                        {empVals.over_time !== "" && (
+                                          <input
+                                            type="text"
+                                            placeholder="Remark"
+                                            value={empVals.remark_overtime}
+                                            onChange={(e) =>
+                                              handleEmployeeInputChange(empId, "remark_overtime", e.target.value)
+                                            }
+                                            className="w-full mt-2 px-2 py-2 border border-slate-200 rounded-md 
+                     focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                          />
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 )
@@ -817,108 +917,108 @@ const CreateInvoice = () => {
           </div>
         )}
 
-       {showPreview && (
-  <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden border border-blue-200">
-    <div className="border-b border-slate-200 px-6 py-4 bg-blue-50">
-      <h2 className="text-2xl font-bold text-slate-900">Preview & Confirm</h2>
-      <p className="text-sm text-slate-600 mt-1">Review the information before submitting</p>
-    </div>
+        {showPreview && (
+          <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden border border-blue-200">
+            <div className="border-b border-slate-200 px-6 py-4 bg-blue-50">
+              <h2 className="text-2xl font-bold text-slate-900">Preview & Confirm</h2>
+              <p className="text-sm text-slate-600 mt-1">Review the information before submitting</p>
+            </div>
 
-    <div className="p-6">
-      <div className="bg-slate-50 rounded-lg p-6 mb-6">
-        <div className="grid grid-cols-1 gap-4">
+            <div className="p-6">
+              <div className="bg-slate-50 rounded-lg p-6 mb-6">
+                <div className="grid grid-cols-1 gap-4">
 
-          {/* Invoice No */}
-          <div>
-            <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Invoice No</p>
-            <p className="text-lg font-semibold text-slate-900">{formData.invoice_no || "—"}</p>
-          </div>
+                  {/* Invoice No */}
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Invoice No</p>
+                    <p className="text-lg font-semibold text-slate-900">{formData.invoice_no || "—"}</p>
+                  </div>
 
-          {/* Client */}
-          <div>
-            <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Client</p>
-            <p className="text-lg font-semibold text-slate-900">
-              {clients.find((c) => String(c.id) === String(formData.client_id))?.name || "—"}
-            </p>
-          </div>
+                  {/* Client */}
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Client</p>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {clients.find((c) => String(c.id) === String(formData.client_id))?.name || "—"}
+                    </p>
+                  </div>
 
-          {/* Issue Date */}
-          <div>
-            <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Issue Date</p>
+                  {/* Issue Date */}
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Issue Date</p>
                     <p className="text-lg font-semibold text-slate-900">{formData.issue_date || "—"}</p>
-          </div>
+                  </div>
 
-          {/* Billing From */}
-          <div>
-            <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Billing From</p>
-            <p className="text-lg font-semibold text-slate-900">{formData.billing_from || "—"}</p>
-          </div>
+                  {/* Billing From */}
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Billing From</p>
+                    <p className="text-lg font-semibold text-slate-900">{formData.billing_from || "—"}</p>
+                  </div>
 
-          {/* Billing To */}
-          <div>
-            <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Billing To</p>
-            <p className="text-lg font-semibold text-slate-900">{formData.billing_to || "—"}</p>
-          </div>
+                  {/* Billing To */}
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Billing To</p>
+                    <p className="text-lg font-semibold text-slate-900">{formData.billing_to || "—"}</p>
+                  </div>
 
-          {/* Projects & Employees */}
-          <div>
-            <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-2">Projects & Employees</p>
-            <div className="space-y-3">
-              {projectsWithEmployees
-                .filter((p) => checkedProjects.has(p.id))
-                .map((p) => (
-                  <div key={p.id} className="p-3 bg-white rounded-md border">
-                    <div className="font-semibold text-slate-800 mb-2">{p.project_name}</div>
-                    <div className="space-y-2">
-                      {(p.employees || [])
-                        .filter((e) => checkedEmployees.has(e.id))
-                        .map((e) => {
-                          const vals = employeeInputs[e.id] || {};
-                          return (
-                            <div key={e.id} className="flex items-center justify-between">
-                              <div className="text-sm text-slate-900">{e.name}</div>
-                              <div className="text-sm text-slate-700">
-                                days: {vals.days || 0} • paid: {vals.paid_leaves || 0} • unpaid: {vals.unpaid_leaves || 0} • ot: {vals.over_time || 0}
-                              </div>
+                  {/* Projects & Employees */}
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-2">Projects & Employees</p>
+                    <div className="space-y-3">
+                      {projectsWithEmployees
+                        .filter((p) => checkedProjects.has(p.id))
+                        .map((p) => (
+                          <div key={p.id} className="p-3 bg-white rounded-md border">
+                            <div className="font-semibold text-slate-800 mb-2">{p.project_name}</div>
+                            <div className="space-y-2">
+                              {(p.employees || [])
+                                .filter((e) => checkedEmployees.has(e.id))
+                                .map((e) => {
+                                  const vals = employeeInputs[e.id] || {};
+                                  return (
+                                    <div key={e.id} className="flex items-center justify-between">
+                                      <div className="text-sm text-slate-900">{e.name}</div>
+                                      <div className="text-sm text-slate-700">
+                                        days: {vals.days || 0} • paid: {vals.paid_leaves || 0} • unpaid: {vals.unpaid_leaves || 0} • ot: {vals.over_time || 0}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                             </div>
-                          );
-                        })}
+                          </div>
+                        ))}
                     </div>
                   </div>
-                ))}
+
+                  {/* Total Amount */}
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Total Amount</p>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {computePreviewTotal().toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={handleEditPreview}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Edit
+                </button>
+
+                <button
+                  onClick={handleFinalSubmit}
+                  disabled={loading}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors"
+                >
+                  Confirm & Submit
+                </button>
+              </div>
             </div>
           </div>
-
-          {/* Total Amount */}
-          <div>
-            <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Total Amount</p>
-            <p className="text-lg font-semibold text-slate-900">
-              {computePreviewTotal().toLocaleString("en-IN", { style: "currency", currency: "INR" })}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Buttons */}
-      <div className="flex justify-end gap-3">
-        <button
-          onClick={handleEditPreview}
-          className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
-        >
-          Edit
-        </button>
-
-        <button
-          onClick={handleFinalSubmit}
-          disabled={loading}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors"
-        >
-          Confirm & Submit
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+        )}
 
 
         {deleteId && (
@@ -939,6 +1039,28 @@ const CreateInvoice = () => {
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium rounded-lg transition-colors"
                 >
                   {loading ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showDeleteModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white p-6 rounded shadow-md w-96">
+              <h2 className="text-lg font-semibold mb-4">Confirm Delete</h2>
+              <p>Are you sure you want to delete this invoice?</p>
+              <div className="flex justify-end gap-4 mt-6">
+                <button
+                  onClick={cancelDelete}
+                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                >
+                  Delete
                 </button>
               </div>
             </div>

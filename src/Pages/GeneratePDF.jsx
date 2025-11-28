@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { jsPDF } from "jspdf";
 import { Download } from "lucide-react";
@@ -18,10 +16,8 @@ const formatToLongDate = (dateStr) => {
   const date = new Date(dateStr);
   const day = date.getDate();
   const year = date.getFullYear();
-
   const month = date.toLocaleString("en-US", { month: "long" });
 
-  // Ordinal suffix
   const getSuffix = (d) => {
     if (d > 3 && d < 21) return "th";
     switch (d % 10) {
@@ -48,8 +44,6 @@ const GeneratePDF = ({ invoiceData }) => {
   }, [invoiceData]);
 
   const {
-    invoice,
-    client,
     projects,
     employeesRaw,
     employeeEntries,
@@ -60,7 +54,7 @@ const GeneratePDF = ({ invoiceData }) => {
     dateOfInvoice: formatToDDMMYY(invoiceData?.invoice?.issue_date),
     billingFrom: invoiceData?.billingFrom,
     billingTo: invoiceData?.billingTo,
-    // COMPANY DETAILS (from backend)
+    // COMPANY DETAILS
     companyName: invoiceData?.company?.name || "N/A",
     companyAddress: invoiceData?.company?.address || "N/A",
     companyState: invoiceData?.company?.state || "N/A",
@@ -96,7 +90,7 @@ const GeneratePDF = ({ invoiceData }) => {
         const total = payPerDay * (emp.days || 0);
 
         return {
-          userId: emp.employee_id,
+          userId: emp.project_emp_code,
           employeeName:
             project?.employees.find((e) => e.id === emp.employee_id)?.name ||
             "Employee",
@@ -106,10 +100,11 @@ const GeneratePDF = ({ invoiceData }) => {
           fromDate: formatToLongDate(commonDataForPdf.billingFrom),
           toDate: formatToLongDate(commonDataForPdf.billingTo),
 
-
           days: emp.days || 0,
           payPerDay: payPerDay,
           totalAmount: total,
+          remark_days: empRaw.remark_days || "",
+          remark_overtime: empRaw.remark_overtime || "",
         };
       })
       : [];
@@ -189,7 +184,7 @@ const GeneratePDF = ({ invoiceData }) => {
 
     // ---------- TABLE ----------
     const startY = 130;
-    const rowHeight = 14;
+    const rowHeight = 18;
     const numRows = resourcesArr.length;
     const tableHeight = rowHeight * numRows + 25;
     const totalTableHeight = startY + tableHeight;
@@ -208,6 +203,8 @@ const GeneratePDF = ({ invoiceData }) => {
     resourcesArr.forEach((res, index) => {
       const currentY = startY + 11 + index * rowHeight;
       const temp = res.payPerDay * res.days;
+      const remarkDaysText = res.remark_days ? ` (${res.remark_days})` : "";
+      const remarkOvertimeText = res.remark_overtime ? ` (${res.remark_overtime})` : "";
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
@@ -217,19 +214,16 @@ const GeneratePDF = ({ invoiceData }) => {
         currentY
       );
       doc.text(`(${res.fromDate} - ${res.toDate})`, 31.5, currentY + 3.3);
-      doc.text(
-        `${res.days} Days * ${res.payPerDay} ${commonDataForPdf.currencyType}`,
-        31.5,
-        currentY + 6.7
-      );
+      doc.text(`${res.days} Days${remarkDaysText}`, 31.5, currentY + 6.7);
+      if (res.remark_overtime) {
+        doc.text(`OT:  ${res.remark_overtime}`, 31.5, currentY + 10);
+      }
       doc.setFont("helvetica", "normal");
       doc.text(temp.toString(), 173, currentY + 3.3);
       doc.text(commonDataForPdf.currencyType, 165, currentY + 3.3);
       doc.text(res.sacCode, 141, currentY + 3.3);
-
-      if (index < numRows - 1) {
-        doc.line(30, currentY + 10, 195, currentY + 10);
-      }
+      doc.text(`${commonDataForPdf.currencyType} ${res.payPerDay}`, 165, currentY + 6.7);
+      if (index < numRows - 1) { doc.line(30, currentY + 10, 195, currentY + 10); }
     });
 
     // ---------- TOTALS ----------
