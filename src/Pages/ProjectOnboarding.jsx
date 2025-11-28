@@ -1,23 +1,31 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2, DollarSign, Clock, User, Hash } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
-import "ag-grid-community/styles/ag-grid.css";
-import "ag-grid-community/styles/ag-theme-quartz.css";
-import DashboardPdf from "../Components/DashboardPdf";
 import LoaderOverlay from "./LoaderOverlay";
 import toast, { Toaster } from "react-hot-toast";
+import DashboardPdf from "../Components/DashboardPdf";
 
-const PROJECT_URI = import.meta.env.VITE_STATE === "DEV" ? `${import.meta.env.VITE_BASE_URL_DEV}` : `${import.meta.env.VITE_BASE_URL_PROD}`;
+// ModuleRegistry.registerModules([AllCommunityModule])
+
+const PROJECT_URI =
+  typeof import.meta !== "undefined" && import.meta.env?.VITE_STATE === "DEV"
+    ? import.meta.env?.VITE_BASE_URL_DEV || ""
+    : import.meta.env?.VITE_BASE_URL_PROD || "";
+
+const emptyEmployee = {
+  emp_id: "",
+  billing_amt: "",
+  overtime_amt: "",
+  billing_method: "days",
+  project_emp_code: "",
+};
 
 const emptyForm = {
   name: "",
   client_id: "",
-  emp_id: [],
-  billing_amt: "",
-  billing_method: "days",
-  overtime_amt: "",
+  project_employees: [emptyEmployee],
   active: true,
 };
 
@@ -25,13 +33,13 @@ const ActionCellRenderer = ({ data, onEdit, onDelete }) => (
   <div className="flex gap-2 justify-end h-full items-center">
     <button
       onClick={() => onEdit(data)}
-      className="inline-flex items-center gap-1 px-3 py-1 text-blue-600 hover:bg-blue-50 rounded transition-colors font-medium text-sm"
+      className="inline-flex items-center gap-1 px-2.5 py-1 text-blue-600 hover:bg-blue-50 rounded text-xs font-medium transition-colors"
     >
       Edit
     </button>
     <button
       onClick={() => onDelete(data.id)}
-      className="inline-flex items-center gap-1 px-3 py-1 text-red-600 hover:bg-red-50 rounded transition-colors font-medium text-sm"
+      className="inline-flex items-center gap-1 px-2.5 py-1 text-red-600 hover:bg-red-50 rounded text-xs font-medium transition-colors"
     >
       Delete
     </button>
@@ -49,7 +57,6 @@ const ProjectOnboarding = () => {
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
-  const [openEmployeeDropdown, setOpenEmployeeDropdown] = useState(false);
   const gridApiRef = useRef(null);
 
   useEffect(() => {
@@ -106,10 +113,20 @@ const ProjectOnboarding = () => {
     const errors = {};
     if (!formData.name.trim()) errors.name = "Project name is required";
     if (!formData.client_id) errors.client_id = "Please select a client";
-    if (!formData.emp_id.length)
-      errors.emp_id = "Please select at least one employee";
-    if (!formData.billing_amt || Number(formData.billing_amt) <= 0)
-      errors.billing_amt = "Billing amount must be greater than 0";
+
+    if (!formData.project_employees.length) {
+      errors.project_employees = "Please add at least one employee";
+    } else {
+      formData.project_employees.forEach((emp, index) => {
+        if (!emp.emp_id) {
+          errors[`emp_id_${index}`] = "Employee is required";
+        }
+        if (!emp.billing_amt || Number(emp.billing_amt) <= 0) {
+          errors[`billing_amt_${index}`] =
+            "Billing amount must be greater than 0";
+        }
+      });
+    }
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -120,6 +137,33 @@ const ProjectOnboarding = () => {
     setFormData({ ...formData, [name]: type === "checkbox" ? checked : value });
     if (validationErrors[name]) {
       setValidationErrors({ ...validationErrors, [name]: "" });
+    }
+  };
+
+  const handleAddEmployee = () => {
+    setFormData({
+      ...formData,
+      project_employees: [...formData.project_employees, { ...emptyEmployee }],
+    });
+  };
+
+  const handleRemoveEmployee = (index) => {
+    const updatedEmployees = formData.project_employees.filter(
+      (_, i) => i !== index
+    );
+    setFormData({ ...formData, project_employees: updatedEmployees });
+  };
+
+  const handleEmployeeChange = (index, field, value) => {
+    const updatedEmployees = [...formData.project_employees];
+    updatedEmployees[index] = { ...updatedEmployees[index], [field]: value };
+    setFormData({ ...formData, project_employees: updatedEmployees });
+
+    const errorKey = `${field}_${index}`;
+    if (validationErrors[errorKey]) {
+      const newErrors = { ...validationErrors };
+      delete newErrors[errorKey];
+      setValidationErrors(newErrors);
     }
   };
 
@@ -145,13 +189,38 @@ const ProjectOnboarding = () => {
 
   const handleEditProject = (project) => {
     setEditingProjectId(project.id);
+
+    let initialEmployees = [];
+
+    if (
+      project.employees &&
+      Array.isArray(project.employees) &&
+      project.employees.length > 0 &&
+      project.employees[0].billing_amt
+    ) {
+      initialEmployees = project.employees.map((emp) => ({
+        emp_id: String(emp.emp_id || emp.id),
+        billing_amt: String(emp.billing_amt),
+        overtime_amt: String(emp.overtime_amt || ""),
+        billing_method: emp.billing_method || "days",
+        project_emp_code: String(emp.project_emp_code || ""),
+      }));
+    } else if (project.emp_id && Array.isArray(project.emp_id)) {
+      initialEmployees = project.emp_id.map((id) => ({
+        emp_id: String(id),
+        billing_amt: String(project.billing_amt),
+        overtime_amt: String(project.overtime_amt || ""),
+        billing_method: project.billing_method || "days",
+        project_emp_code: "",
+      }));
+    } else {
+      initialEmployees = [emptyEmployee];
+    }
+
     setFormData({
       name: project.name,
       client_id: String(project.client_id),
-      emp_id: project.emp_id?.map(String) || [],
-      billing_amt: String(project.billing_amt),
-      billing_method: project.billing_method,
-      overtime_amt: String(project.overtime_amt || ""),
+      project_employees: initialEmployees,
       active: project.active,
     });
     setShowForm(true);
@@ -185,11 +254,13 @@ const ProjectOnboarding = () => {
       const payload = {
         name: formData.name,
         client_id: Number(formData.client_id),
-        emp_ids: formData.emp_id.map(Number),
-        billing_amt: Number(formData.billing_amt),
-        billing_method: formData.billing_method,
-        overtime_amt: formData.overtime_amt ? Number(formData.overtime_amt) : 0,
-        active: formData.active,
+        employees: formData.project_employees.map((emp) => ({
+          emp_id: Number(emp.emp_id),
+          project_emp_code: emp.project_emp_code || null,
+          billing_amt: emp.billing_amt ? Number(emp.billing_amt) : 0,
+          billing_method: emp.billing_method || "days",
+          overtime_amt: emp.overtime_amt ? Number(emp.overtime_amt) : 0,
+        })),
       };
 
       const method = editingProjectId ? "PUT" : "POST";
@@ -225,11 +296,12 @@ const ProjectOnboarding = () => {
   const filteredProjects = projects;
 
   const columnDefs = [
-    { field: "name", headerName: "Project Name", minWidth: 150 },
+    { field: "name", headerName: "Project Name", minWidth: 150, flex: 1 },
     {
       field: "client_id",
       headerName: "Client",
       minWidth: 150,
+      flex: 1,
       valueGetter: (params) =>
         clients.find((c) => c.id === params.data.client_id)?.name || "-",
     },
@@ -237,25 +309,17 @@ const ProjectOnboarding = () => {
       field: "employees",
       headerName: "Employees",
       minWidth: 200,
-      valueGetter: (params) => {
-        return params.data.employees
-          ?.map((emp) => emp.emp_name)
-          .join(", ") || "-";
-      },
+      flex: 2,
+      valueGetter: (params) =>
+        params.data.employees
+          ?.map((emp) => emp.emp_name || emp.name)
+          .join(", ") || "-",
     },
-    { field: "billing_amt", headerName: "Billing Amount", minWidth: 120 },
-    {
-      field: "billing_method",
-      headerName: "Method",
-      minWidth: 100,
-      valueFormatter: (params) =>
-        params.value?.charAt(0).toUpperCase() + params.value?.slice(1),
-    },
-    { field: "overtime_amt", headerName: "Overtime", minWidth: 100 },
     {
       field: "active",
       headerName: "Status",
       minWidth: 100,
+      flex: 1,
       valueFormatter: (params) => (params.value ? "Active" : "Inactive"),
     },
     {
@@ -272,69 +336,62 @@ const ProjectOnboarding = () => {
     },
   ];
 
-  useEffect(() => {
-    const handler = (e) => {
-      if (!e.target.closest(".employee-dropdown-area")) {
-        setOpenEmployeeDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  const getEmployeeName = (empId) => {
+    const emp = employees.find((e) => String(e.id) === String(empId));
+    return emp?.name || "Unknown";
+  };
 
   return (
-    <div className="min-h-screen font-sans">
+    <div className="min-h-screen bg-slate-50 font-sans">
       <LoaderOverlay isLoading={loading} message="Processing..." />
       <Toaster position="top-right" />
-
       <DashboardPdf />
-      <div className="max-w-7xl mx-auto p-4 md:p-8">
+
+      <div className="max-w-6xl mx-auto p-4 md:p-6">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold text-slate-900">
             Project Management
           </h1>
-          <p className="text-slate-600">
-            Manage and onboard your projects efficiently
+          <p className="text-slate-500 text-sm mt-0.5">
+            Manage and onboard your projects
           </p>
         </div>
 
         {/* Add Button */}
         {!showForm && !showPreview && (
-          <div className="flex justify-end mb-6">
+          <div className="flex justify-end mb-4">
             <button
               onClick={handleOpenForm}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors"
             >
-              <Plus className="h-5 w-5" />
+              <Plus className="h-4 w-4" />
               Add Project
             </button>
           </div>
         )}
 
-        {/* Your existing Form + Preview code here (unchanged) */}
-
         {/* Delete Confirmation Modal */}
         {deleteId && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
-              <h3 className="text-lg font-semibold text-slate-900">
+            <div className="bg-white rounded-lg shadow-lg p-5 max-w-sm w-full">
+              <h3 className="text-base font-semibold text-slate-900">
                 Delete Project?
               </h3>
-              <p className="text-sm text-slate-600 mt-1 mb-4">
+              <p className="text-sm text-slate-500 mt-1 mb-4">
                 This action cannot be undone.
               </p>
-              <div className="flex justify-end gap-3">
+              <div className="flex justify-end gap-2">
                 <button
                   onClick={() => setDeleteId(null)}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                  className="px-3 py-1.5 border border-slate-300 text-slate-700 text-sm font-medium rounded-md hover:bg-slate-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDelete}
                   disabled={loading}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium rounded-lg transition-colors"
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white text-sm font-medium rounded-md transition-colors"
                 >
                   {loading ? "Deleting..." : "Delete"}
                 </button>
@@ -345,56 +402,59 @@ const ProjectOnboarding = () => {
 
         {/* Form View */}
         {showForm && (
-          <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="border-b border-slate-200 px-6 py-4">
-              <h2 className="text-2xl font-bold text-slate-900">
+          <div className="mb-6 bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+            <div className="border-b border-slate-200 px-5 py-3">
+              <h2 className="text-lg font-semibold text-slate-900">
                 {editingProjectId ? "Edit Project" : "Add New Project"}
               </h2>
-              <p className="text-slate-600 text-sm mt-1">
+              <p className="text-slate-500 text-xs mt-0.5">
                 {editingProjectId
                   ? "Update project information"
                   : "Fill in the details to add a new project"}
               </p>
             </div>
-            <div className="p-6">
-              <form onSubmit={handleFormSubmit} className="space-y-6">
-                {/* Project Name */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-900 mb-2">
-                    Project Name <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    placeholder="Enter project name"
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${validationErrors.name
-                        ? "border-red-500 bg-red-50"
-                        : "border-slate-300 bg-white"
-                      }`}
-                  />
-                  {validationErrors.name && (
-                    <p className="text-red-600 text-sm mt-1">
-                      {validationErrors.name}
-                    </p>
-                  )}
-                </div>
 
-                {/* Client and Employee */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-5">
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Project Name */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-900 mb-2">
-                      Client <span className="text-red-600">*</span>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Project Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      placeholder="Enter project name"
+                      className={`w-full px-2.5 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${
+                        validationErrors.name
+                          ? "border-red-400 bg-red-50"
+                          : "border-slate-300 bg-white"
+                      }`}
+                    />
+                    {validationErrors.name && (
+                      <p className="text-red-500 text-xs mt-0.5">
+                        {validationErrors.name}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Client */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Client <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="client_id"
                       value={formData.client_id}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${validationErrors.client_id
-                          ? "border-red-500 bg-red-50"
+                      className={`w-full px-2.5 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${
+                        validationErrors.client_id
+                          ? "border-red-400 bg-red-50"
                           : "border-slate-300 bg-white"
-                        }`}
+                      }`}
                     >
                       <option value="">Select Client</option>
                       {clients.map((client) => (
@@ -404,192 +464,250 @@ const ProjectOnboarding = () => {
                       ))}
                     </select>
                     {validationErrors.client_id && (
-                      <p className="text-red-600 text-sm mt-1">
+                      <p className="text-red-500 text-xs mt-0.5">
                         {validationErrors.client_id}
                       </p>
                     )}
                   </div>
+                </div>
 
-                  <div>
-                    <div className="employee-dropdown-area relative">
-                      <label className="block text-sm font-medium text-slate-900 mb-2">
-                        Employee <span className="text-red-600">*</span>
-                      </label>
+                {/* Employee Repeater */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-medium text-slate-700">
+                      Project Employees <span className="text-red-500">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddEmployee}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 rounded font-medium transition-colors"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Add
+                    </button>
+                  </div>
 
-                      {/* Trigger Box */}
+                  {validationErrors.project_employees && (
+                    <p className="text-red-500 text-xs">
+                      {validationErrors.project_employees}
+                    </p>
+                  )}
+
+                  <div className="space-y-2">
+                    {formData.project_employees.map((emp, index) => (
                       <div
-                        onClick={() => setOpenEmployeeDropdown((prev) => !prev)}
-                        className={`w-full px-3 py-2 border rounded-lg bg-white cursor-pointer flex items-center justify-between ${validationErrors.emp_id
-                            ? "border-red-500 bg-red-50"
-                            : "border-slate-300"
-                          }`}
+                        key={index}
+                        className="border border-slate-200 rounded-md bg-white overflow-hidden"
                       >
-                        <span className="truncate">
-                          {formData.emp_id.length === 0
-                            ? "Select employees"
-                            : employees
-                              .filter((emp) =>
-                                formData.emp_id.includes(emp.id)
-                              )
-                              .map((emp) => emp.name)
-                              .join(", ")}
-                        </span>
-
-                        <svg
-                          className={`w-4 h-4 transition-transform ${openEmployeeDropdown ? "rotate-180" : ""
-                            }`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </div>
-
-                      {/* Dropdown */}
-                      {openEmployeeDropdown && (
-                        <div className="absolute left-0 right-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-lg z-30 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150">
-                          {employees.map((emp) => (
-                            <label
-                              key={emp.id}
-                              className="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={formData.emp_id.includes(emp.id)}
-                                onChange={() => {
-                                  const updated = formData.emp_id.includes(
-                                    emp.id
-                                  )
-                                    ? formData.emp_id.filter(
-                                      (id) => id !== emp.id
-                                    )
-                                    : [...formData.emp_id, emp.id];
-
-                                  setFormData({ ...formData, emp_id: updated });
-
-                                  if (validationErrors.emp_id) {
-                                    setValidationErrors({
-                                      ...validationErrors,
-                                      emp_id: "",
-                                    });
-                                  }
-                                }}
-                                className="h-4 w-4 text-blue-600"
-                              />
-                              <span className="text-sm text-slate-800">
-                                {emp.name}
-                              </span>
-                            </label>
-                          ))}
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-200">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                              <User className="h-3 w-3 text-blue-600" />
+                            </div>
+                            <span className="text-xs font-medium text-slate-700">
+                              Employee {index + 1}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEmployee(index)}
+                            className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                            title="Remove employee"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
-                      )}
 
-                      {/* Validation Error */}
-                      {validationErrors.emp_id && (
-                        <p className="text-red-600 text-sm mt-1">
-                          {validationErrors.emp_id}
-                        </p>
-                      )}
-                    </div>
+                        <div className="p-3">
+                          <div className="flex flex-wrap items-start gap-3">
+                            {/* Employee Select */}
+                            <div className="flex-1 min-w-[140px]">
+                              <label className="block text-[10px] uppercase tracking-wide font-medium text-slate-500 mb-1">
+                                Employee
+                              </label>
+                              <select
+                                value={emp.emp_id}
+                                onChange={(e) =>
+                                  handleEmployeeChange(
+                                    index,
+                                    "emp_id",
+                                    e.target.value
+                                  )
+                                }
+                                className={`w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${
+                                  validationErrors[`emp_id_${index}`]
+                                    ? "border-red-400 bg-red-50"
+                                    : "border-slate-300 bg-white"
+                                }`}
+                              >
+                                <option value="">Select</option>
+                                {employees.map((empOpt) => (
+                                  <option
+                                    key={empOpt.id}
+                                    value={empOpt.id}
+                                    disabled={formData.project_employees.some(
+                                      (item, i) =>
+                                        i !== index &&
+                                        item.emp_id === String(empOpt.id)
+                                    )}
+                                  >
+                                    {empOpt.name}
+                                  </option>
+                                ))}
+                              </select>
+                              {validationErrors[`emp_id_${index}`] && (
+                                <p className="text-red-500 text-[10px] mt-0.5">
+                                  {validationErrors[`emp_id_${index}`]}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Project Employee Code - NEW FIELD */}
+                            <div className="flex-1 min-w-[120px]">
+                              <label className="block text-[10px] uppercase tracking-wide font-medium text-slate-500 mb-1">
+                                Project Emp Code
+                              </label>
+                              <div className="relative">
+                                <Hash className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                                <input
+                                  type="text"
+                                  value={emp.project_emp_code}
+                                  onChange={(e) =>
+                                    handleEmployeeChange(
+                                      index,
+                                      "project_emp_code",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="Code"
+                                  className="w-full pl-6 pr-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 transition bg-white"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Billing Amount */}
+                            <div className="flex-1 min-w-[100px]">
+                              <label className="block text-[10px] uppercase tracking-wide font-medium text-slate-500 mb-1">
+                                Base Rate
+                              </label>
+                              <div className="relative">
+                                <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                                <input
+                                  type="number"
+                                  value={emp.billing_amt}
+                                  onChange={(e) =>
+                                    handleEmployeeChange(
+                                      index,
+                                      "billing_amt",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="0"
+                                  className={`w-full pl-6 pr-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${
+                                    validationErrors[`billing_amt_${index}`]
+                                      ? "border-red-400 bg-red-50"
+                                      : "border-slate-300 bg-white"
+                                  }`}
+                                />
+                              </div>
+                              {validationErrors[`billing_amt_${index}`] && (
+                                <p className="text-red-500 text-[10px] mt-0.5">
+                                  Required
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Overtime Amount */}
+                            <div className="flex-1 min-w-[100px]">
+                              <label className="block text-[10px] uppercase tracking-wide font-medium text-slate-500 mb-1">
+                                Overtime
+                              </label>
+                              <div className="relative">
+                                <Clock className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                                <input
+                                  type="number"
+                                  value={emp.overtime_amt}
+                                  onChange={(e) =>
+                                    handleEmployeeChange(
+                                      index,
+                                      "overtime_amt",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="0"
+                                  className="w-full pl-6 pr-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 transition bg-white"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Billing Method - Segmented buttons */}
+                            <div className="flex-1 min-w-[130px]">
+                              <label className="block text-[10px] uppercase tracking-wide font-medium text-slate-500 mb-1">
+                                Method
+                              </label>
+                              <div className="flex border border-slate-300 rounded overflow-hidden">
+                                {["days", "hours", "fixed"].map((method) => (
+                                  <button
+                                    key={method}
+                                    type="button"
+                                    onClick={() =>
+                                      handleEmployeeChange(
+                                        index,
+                                        "billing_method",
+                                        method
+                                      )
+                                    }
+                                    className={`flex-1 px-1.5 py-1.5 text-[10px] font-medium capitalize transition-colors ${
+                                      emp.billing_method === method
+                                        ? "bg-blue-600 text-white"
+                                        : "bg-white text-slate-600 hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    {method === "fixed" ? "Month" : method}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                {/* Billing Amounts */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-900 mb-2">
-                      Base Amount <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="billing_amt"
-                      value={formData.billing_amt}
-                      onChange={handleChange}
-                      placeholder="Enter billing amount"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${validationErrors.billing_amt
-                          ? "border-red-500 bg-red-50"
-                          : "border-slate-300 bg-white"
-                        }`}
-                    />
-                    {validationErrors.billing_amt && (
-                      <p className="text-red-600 text-sm mt-1">
-                        {validationErrors.billing_amt}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-900 mb-2">
-                      Overtime Amount{" "}
-                      <span className="text-slate-500 text-xs">(Optional)</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="overtime_amt"
-                      value={formData.overtime_amt}
-                      onChange={handleChange}
-                      placeholder="Enter overtime amount"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition bg-white"
-                    />
-                  </div>
-                </div>
-
-                {/* Billing Method */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-900 mb-2">
-                    Billing Method
-                  </label>
-                  <select
-                    name="billing_method"
-                    value={formData.billing_method}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition bg-white"
-                  >
-                    <option value="days">Days</option>
-                    <option value="hours">Hours</option>
-                    <option value="month">Month</option>
-                  </select>
-                </div>
-
-                {/* Active Checkbox */}
-                <div className="flex items-center gap-3">
+                {/* Active Status */}
+                <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     name="active"
+                    id="active"
                     checked={formData.active}
                     onChange={handleChange}
-                    className="h-4 w-4 text-blue-600 rounded"
+                    className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
                   />
-                  <label className="text-sm font-medium text-slate-900">
+                  <label
+                    htmlFor="active"
+                    className="text-xs font-medium text-slate-700"
+                  >
                     Active Project
                   </label>
                 </div>
 
                 {/* Form Actions */}
-                <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowForm(false);
-                      setFormData(emptyForm);
-                      setEditingProjectId(null);
-                      setValidationErrors({});
-                    }}
-                    className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                    onClick={() => setShowForm(false)}
+                    className="px-3 py-1.5 border border-slate-300 text-slate-700 text-sm font-medium rounded-md hover:bg-slate-50 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-colors"
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors"
                   >
-                    {loading ? "Loading..." : "Preview"}
+                    Preview
                   </button>
                 </div>
               </form>
@@ -597,137 +715,96 @@ const ProjectOnboarding = () => {
           </div>
         )}
 
-        {/* Preview */}
+        {/* Preview Modal */}
         {showPreview && (
-          <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden border border-blue-200">
-            <div className="border-b border-slate-200 px-6 py-4 bg-blue-50">
-              <h2 className="text-2xl font-bold text-slate-900">
-                Preview & Confirm
-              </h2>
-              <p className="text-slate-600 text-sm mt-1">
-                Review the information before submitting
-              </p>
-            </div>
-            <div className="p-6">
-              <div className="bg-slate-50 rounded-lg p-6 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-xl max-w-lg w-full my-8">
+              <div className="border-b border-slate-200 px-5 py-3 flex justify-between items-center">
+                <h3 className="text-base font-semibold text-slate-900">
+                  Confirm Project Details
+                </h3>
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
+                    <p className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">
                       Project Name
                     </p>
-                    <p className="text-lg font-semibold text-slate-900">
+                    <p className="text-sm font-medium text-slate-900">
                       {formData.name}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
+                    <p className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">
                       Client
                     </p>
-                    <p className="text-lg font-semibold text-slate-900">
-                      {clients.find((c) => c.id === Number(formData.client_id))
-                        ?.name || "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
-                      Employee
-                    </p>
-                    <p className="text-lg font-semibold text-slate-900">
-                      {formData.emp_id
-                        .map(
-                          (id) =>
-                            employees.find((e) => e.id === Number(id))?.name
-                        )
-                        .join(", ")}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
-                      Base Amount
-                    </p>
-                    <p className="text-lg font-semibold text-slate-900">
-                      {formData.billing_amt}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
-                      Overtime Amount
-                    </p>
-                    <p className="text-lg font-semibold text-slate-900">
-                      {formData.overtime_amt || "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
-                      Billing Method
-                    </p>
-                    <p className="text-lg font-semibold text-slate-900 capitalize">
-                      {formData.billing_method}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">
-                      Status
-                    </p>
-                    <p
-                      className={`text-lg font-semibold ${formData.active ? "text-green-600" : "text-red-600"
-                        }`}
-                    >
-                      {formData.active ? "Active" : "Inactive"}
+                    <p className="text-sm font-medium text-slate-900">
+                      {clients.find((c) => String(c.id) === formData.client_id)
+                        ?.name || "-"}
                     </p>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
-                <button
-                  onClick={handleEditPreview}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={handleFinalSubmit}
-                  disabled={loading}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors"
-                >
-                  {loading
-                    ? "Submitting..."
-                    : editingProjectId
-                      ? "Update"
-                      : "Submit"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Delete Confirmation */}
-        {deleteId && (
-          <div className="mb-8 bg-white rounded-lg shadow-md overflow-hidden border border-red-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-semibold text-slate-900">
-                    Delete Project?
+                  <p className="text-[10px] uppercase tracking-wide text-slate-500 mb-2">
+                    Employees ({formData.project_employees.length})
                   </p>
-                  <p className="text-sm text-slate-600 mt-1">
-                    This action cannot be undone.
-                  </p>
+                  <div className="space-y-1.5">
+                    {formData.project_employees.map((emp, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between text-sm bg-slate-50 px-3 py-2 rounded"
+                      >
+                        <div>
+                          <span className="font-medium text-slate-700">
+                            {getEmployeeName(emp.emp_id)}
+                          </span>
+                          {emp.project_emp_code && (
+                            <span className="text-slate-400 text-xs ml-2">
+                              ({emp.project_emp_code})
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-slate-500 text-xs">
+                          ${emp.billing_amt}/{emp.billing_method}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex gap-3">
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
                   <button
-                    onClick={() => setDeleteId(null)}
-                    className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                    onClick={handleEditPreview}
+                    className="px-3 py-1.5 border border-slate-300 text-slate-700 text-sm font-medium rounded-md hover:bg-slate-50 transition-colors"
                   >
-                    Cancel
+                    Back to Edit
                   </button>
                   <button
-                    onClick={confirmDelete}
+                    onClick={handleFinalSubmit}
                     disabled={loading}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium rounded-lg transition-colors"
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium rounded-md shadow-sm transition-colors"
                   >
-                    {loading ? "Deleting..." : "Delete"}
+                    {loading ? "Saving..." : "Confirm & Save"}
                   </button>
                 </div>
               </div>
@@ -735,39 +812,24 @@ const ProjectOnboarding = () => {
           </div>
         )}
 
-        {/* AG Grid Table */}
+        {/* Grid View */}
         {!showForm && !showPreview && (
-          <div className="bg-white rounded-lg overflow-hidden">
-            <div className="py-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">
-                Projects{" "}
-                <span className="text-slate-500 font-normal">
-                  ({filteredProjects?.length || 0})
-                </span>
-              </h3>
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+            <div
+              className="ag-theme-quartz"
+              style={{ height: "500px", width: "100%" }}
+            >
+              <AgGridReact
+                ref={gridApiRef}
+                rowData={filteredProjects}
+                columnDefs={columnDefs}
+                pagination
+                paginationPageSize={10}
+                onGridReady={onGridReady}
+                overlayLoadingTemplate='<span class="ag-overlay-loading-center">Loading projects...</span>'
+                overlayNoRowsTemplate='<span class="ag-overlay-no-rows-center">No projects found</span>'
+              />
             </div>
-
-            {filteredProjects?.length > 0 ? (
-              <div
-                className="ag-theme-quartz"
-                style={{ height: "500px", width: "100%" }}
-              >
-                <AgGridReact
-                  rowData={filteredProjects || []}
-                  columnDefs={columnDefs}
-                  pagination
-                  paginationPageSize={10}
-                  onGridReady={onGridReady}
-                />
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-20 text-center text-slate-500">
-                <p className="text-lg font-medium">No projects found</p>
-                <p className="text-sm text-slate-400 mt-1">
-                  Start by adding a new project.
-                </p>
-              </div>
-            )}
           </div>
         )}
       </div>
