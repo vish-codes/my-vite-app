@@ -1,28 +1,43 @@
-import React, { useState } from 'react';
-import { Document, Page, Text, View, StyleSheet, Font, Image, PDFViewer } from '@react-pdf/renderer';
-import OfferForm from './OfferForm';
-import NavBarLetters from './NavBarLetters';
+import React, { useState } from "react";
+import {
+  Document,
+  Page,
+  Text,
+  View,
+  StyleSheet,
+  Font,
+  Image,
+  PDFViewer,
+} from "@react-pdf/renderer";
+import OfferForm from "./OfferForm";
+import DashboardPdf from "../DashboardPdf";
 
 // Register fonts
 Font.register({
-  family: 'Roboto',
+  family: "Roboto",
   fonts: [
-    { src: 'https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-light-webfont.ttf', fontWeight: 'normal' },
-    { src: 'https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-bold-webfont.ttf', fontWeight: 'bold' },
+    {
+      src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-light-webfont.ttf",
+      fontWeight: "normal",
+    },
+    {
+      src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-bold-webfont.ttf",
+      fontWeight: "bold",
+    },
   ],
 });
 
 // Styles
 const styles = StyleSheet.create({
   page: {
-    fontFamily: 'Roboto',
+    fontFamily: "Roboto",
     fontSize: 10,
     paddingTop: 35,
     paddingBottom: 65,
     paddingHorizontal: 35,
   },
   header: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 20,
   },
   logo: {
@@ -31,17 +46,17 @@ const styles = StyleSheet.create({
   },
   companyInfo: {
     flexGrow: 1,
-    textAlign: 'right',
+    textAlign: "right",
     fontSize: 8,
   },
   companyName: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   title: {
     fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: "bold",
+    textAlign: "center",
     marginVertical: 10,
   },
   content: {
@@ -51,16 +66,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   bold: {
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   footer: {
-    position: 'absolute',
+    position: "absolute",
     fontSize: 8,
     bottom: 30,
     left: 35,
     right: 35,
-    textAlign: 'center',
-    color: 'grey',
+    textAlign: "center",
+    color: "grey",
   },
 });
 
@@ -72,8 +87,12 @@ const OfferLetterPDF = ({ data }) => (
       <View style={styles.header}>
         <Image style={styles.logo} src="../images/panorama.png" />
         <View style={styles.companyInfo}>
-          <Text style={styles.companyName}>PANORAMA SOFTWARE SOLUTIONS PVT LTD</Text>
-          <Text>Unit no - 621-622, 6th Floor, Tower 1, Assotech Business Cresterra,</Text>
+          <Text style={styles.companyName}>
+            PANORAMA SOFTWARE SOLUTIONS PVT LTD
+          </Text>
+          <Text>
+            Unit no - 621-622, 6th Floor, Tower 1, Assotech Business Cresterra,
+          </Text>
           <Text>Sector 135, Noida - 201304, Uttar Pradesh</Text>
           <Text>Mobile: +919888887651</Text>
           <Text>Email: Hr@panoramasoftware.in</Text>
@@ -88,13 +107,18 @@ const OfferLetterPDF = ({ data }) => (
 
       <View style={styles.content}>
         <Text style={styles.paragraph}>
-          We are pleased to offer you the position of <Text style={styles.bold}>Software Engineer</Text> with Panorama Software Solutions. 
-          Your joining date will be the <Text style={styles.bold}>{data.joiningDate}</Text>, on the following terms and conditions:
+          We are pleased to offer you the position of{" "}
+          <Text style={styles.bold}>Software Engineer</Text> with Panorama
+          Software Solutions. Your joining date will be the{" "}
+          <Text style={styles.bold}>{data.joiningDate}</Text>, on the following
+          terms and conditions:
         </Text>
 
         <Text style={styles.paragraph}>
-          <Text style={styles.bold}>1. Designation:</Text> Your present designation is <Text style={styles.bold}>Software Engineer</Text>. 
-          We may change this designation from time to time, to reflect a change in your responsibilities.
+          <Text style={styles.bold}>1. Designation:</Text> Your present
+          designation is <Text style={styles.bold}>Software Engineer</Text>. We
+          may change this designation from time to time, to reflect a change in
+          your responsibilities.
         </Text>
 
         {/* Add more paragraphs here */}
@@ -102,8 +126,9 @@ const OfferLetterPDF = ({ data }) => (
 
       {/* Footer */}
       <Text style={styles.footer}>
-        Unit no - 621-622, 6th Floor, Tower 1, Assotech Business Cresterra, Sector 135, Noida - 201304, Uttar Pradesh
-        {'\n'}
+        Unit no - 621-622, 6th Floor, Tower 1, Assotech Business Cresterra,
+        Sector 135, Noida - 201304, Uttar Pradesh
+        {"\n"}
         Classification: Confidential
       </Text>
     </Page>
@@ -123,7 +148,7 @@ export default function OfferLetterTemplate() {
 
   return (
     <div className="mx-auto bg-gray-50">
-      <NavBarLetters />
+      <DashboardPdf />
       <div className="max-w-7xl mx-auto">
         <div className="mt-5">
           <button

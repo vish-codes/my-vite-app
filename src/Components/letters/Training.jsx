@@ -10,7 +10,7 @@ import {
   PDFViewer,
 } from "@react-pdf/renderer";
 import TrainingForm from "./TrainingForm";
-import NavBarLetters from "./NavBarLetters";
+import DashboardPdf from "../DashboardPdf";
 
 // Register fonts
 Font.register({
@@ -256,7 +256,7 @@ export default function Training() {
 
   return (
     <div className="mx-auto bg-gray-50">
-      <NavBarLetters />
+      <DashboardPdf />
       <div className="max-w-7xl mx-auto">
         <div className="mt-5">
           <button

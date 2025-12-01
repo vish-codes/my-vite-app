@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { Plus } from "lucide-react"
+import { Plus, Pencil, Trash2 } from "lucide-react"
 import { AgGridReact } from "ag-grid-react"
 import "ag-grid-community/styles/ag-grid.css"
 import "ag-grid-community/styles/ag-theme-quartz.css"
@@ -22,13 +22,13 @@ const ActionCellRenderer = ({ data, onEdit, onDelete }) => (
       onClick={() => onEdit(data)}
       className="inline-flex items-center gap-1 px-3 py-1 text-blue-600 hover:bg-blue-50 rounded transition-colors font-medium text-sm"
     >
-      Edit
+      <Pencil className="h-4 w-4" />
     </button>
     <button
       onClick={() => onDelete(data.id)}
       className="inline-flex items-center gap-1 px-3 py-1 text-red-600 hover:bg-red-50 rounded transition-colors font-medium text-sm"
     >
-      Delete
+      <Trash2 className="h-4 w-4" />
     </button>
   </div>
 )

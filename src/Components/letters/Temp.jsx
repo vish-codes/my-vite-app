@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { jsPDF } from "jspdf";
 import { ToWords } from "to-words";
 import OfferForm from "./OfferForm";
-import NavBarLetters from "./NavBarLetters";
+import DashboardPdf from "../DashboardPdf";
 
 // Initialize ToWords
 const toWords = new ToWords({
@@ -303,7 +303,7 @@ export default function Offer() {
 
   return (
     <div className="mx-auto">
-      <NavBarLetters />
+      <DashboardPdf />
       <div className="max-w-7xl mx-auto">
         <div className="mt-5">
           <button

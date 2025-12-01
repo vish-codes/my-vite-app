@@ -12,7 +12,7 @@ import {
   PDFViewer,
 } from "@react-pdf/renderer";
 import ExperienceForm from "./ExperienceForm";
-import NavBarLetters from "./NavBarLetters";
+import DashboardPdf from "../DashboardPdf";
 
 // Register fonts
 Font.register({
@@ -280,7 +280,7 @@ export default function Experience() {
 
   return (
     <div className="mx-auto">
-      <NavBarLetters />
+      <DashboardPdf />
       <div className="max-w-7xl mx-auto">
         <div className="flex md:px-7 lg:px-20 flex-col mt-3 rounded-2xl w-full h-screen sm:px-5">
           <div className="mt-5">

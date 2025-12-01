@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-quartz.css";
@@ -33,13 +33,13 @@ const ActionCellRenderer = ({ data, onEdit, onDelete }) => (
       onClick={() => onEdit(data)}
       className="inline-flex items-center gap-1 px-3 py-1 text-blue-600 hover:bg-blue-50 rounded transition-colors font-medium text-sm"
     >
-      Edit
+      <Pencil className="h-4 w-4" />
     </button>
     <button
       onClick={() => onDelete(data.id)}
       className="inline-flex items-center gap-1 px-3 py-1 text-red-600 hover:bg-red-50 rounded transition-colors font-medium text-sm"
     >
-      Delete
+      <Trash2 className="h-4 w-4" />
     </button>
   </div>
 );
@@ -103,10 +103,19 @@ const ClientOnboarding = () => {
     if (!formData.name.trim()) errors.name = "Client name is required";
     if (!formData.address.trim()) errors.address = "Address is required";
     if (!formData.tax_rate.trim()) errors.tax_rate = "Tax rate is required";
-    if (!formData.company_id.trim())
+    if (!formData.company_id)
       errors.company_id = "Company Name is required";
-    if (formData.tax_rate !== "N/A" && !formData.gst_number.trim()) {
-      errors.gst_number = "GST Number is required";
+    if (formData.tax_rate !== "N/A") {
+      if (!formData.gst_number.trim()) {
+        errors.gst_number = "GST Number is required";
+      } else {
+        const gstRegex =
+          /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
+        if (!gstRegex.test(formData.gst_number.toUpperCase())) {
+          errors.gst_number = "Invalid GST Number format";
+        }
+      }
     }
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -293,6 +302,8 @@ const ClientOnboarding = () => {
       filter: false,
     },
   ];
+
+  console.log("formData---->", formData);
 
   return (
     <div className="min-h-screen font-sans">
