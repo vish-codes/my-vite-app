@@ -77,46 +77,64 @@ const GeneratePDF = ({ invoiceData }) => {
   const resourcesArr =
     employeeEntries && employeeEntries.length > 0
       ? employeeEntries.map((emp) => {
-        const project = projects?.find((p) =>
-          p.employees.some((e) => e.id === emp.employee_id)
-        );
+          const project = projects?.find((p) =>
+            p.employees.some((e) => e.id === emp.employee_id)
+          );
 
-        const empRaw = employeesRaw?.[String(emp.employee_id)] || {};
+          const empRaw = employeesRaw?.[String(emp.employee_id)] || {};
 
-        const payPerDay = project?.billing_amt
-          ? Number(project.billing_amt)
-          : 0;
+          const payPerDay = project?.billing_amt
+            ? Number(project.billing_amt)
+            : 0;
 
-        const total = payPerDay * (emp.days || 0);
+          const total = payPerDay * (emp.days || 0);
 
-        return {
-          userId: emp.project_emp_code,
-          employeeName:
-            project?.employees.find((e) => e.id === emp.employee_id)?.name ||
-            "Employee",
-          workingOn: project?.project_name || "Project",
-          sacCode: "9983",
+          return {
+            userId: emp.project_emp_code,
+            employeeName:
+              project?.employees.find((e) => e.id === emp.employee_id)?.name ||
+              "Employee",
+            workingOn: project?.project_name || "Project",
+            sacCode: "9983",
 
-          fromDate: formatToLongDate(commonDataForPdf.billingFrom),
-          toDate: formatToLongDate(commonDataForPdf.billingTo),
+            fromDate: formatToLongDate(commonDataForPdf.billingFrom),
+            toDate: formatToLongDate(commonDataForPdf.billingTo),
 
-          days: emp.days || 0,
-          payPerDay: payPerDay,
-          totalAmount: total,
-          remark_days: empRaw.remark_days || "",
-          remark_overtime: empRaw.remark_overtime || "",
-        };
-      })
+            days: emp.days || 0,
+            payPerDay,
+            totalAmount: total,
+            remark_days: empRaw.remark_days || "",
+            remark_overtime: empRaw.remark_overtime || "",
+          };
+        })
       : [];
 
-  const calculateTotals = (gstRate) => {
+  /* ------------------ GST CALCULATION LOGIC ------------------ */
+  const calculateTotals = (gstRateStr) => {
     const subTotal = resourcesArr.reduce(
-      (acc, val) => acc + val.payPerDay * val.days,
+      (acc, val) => acc + val.totalAmount,
       0
     );
-    const igst = (subTotal * gstRate) / 100;
-    const total = subTotal + igst;
-    return { subTotal, igst, total };
+
+    let gstType = "NONE";
+    let igst = 0;
+    let cgst = 0;
+    let sgst = 0;
+
+    if (!gstRateStr || gstRateStr === "N/A") {
+      gstType = "NONE";
+    } else if (gstRateStr === "18%") {
+      gstType = "IGST";
+      igst = (subTotal * 18) / 100;
+    } else if (gstRateStr === "9% + 9%") {
+      gstType = "CGST_SGST";
+      cgst = (subTotal * 9) / 100;
+      sgst = (subTotal * 9) / 100;
+    }
+
+    const total = subTotal + igst + cgst + sgst;
+
+    return { subTotal, igst, cgst, sgst, total, gstType };
   };
 
   const totals = calculateTotals(commonDataForPdf.gstRate);
@@ -137,9 +155,12 @@ const GeneratePDF = ({ invoiceData }) => {
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(9.5);
-    doc.text("621-622, Tower 1, Assotech Business Cresterra", 30, 42);
-    doc.text("Sector - 135, Noida,", 30, 46);
-    doc.text("Uttar Pradesh - 201305", 30, 50);
+    doc.setFont("helvetica", "bold");
+    doc.text("Registered Address: ", 30, 42);
+    doc.setFont("helvetica", "normal");
+    doc.text("621-622, Tower 1,", 65, 42);
+    doc.text("Assotech Business Cresterra Sector - 135,", 30, 46);
+    doc.text("Noida, Uttar Pradesh - 201305", 30, 50);
 
     // ---------- BANK DETAILS ----------
     doc.rect(30, 56, 170, 20);
@@ -156,7 +177,7 @@ const GeneratePDF = ({ invoiceData }) => {
 
     doc.setFontSize(8.8);
     doc.setFont("helvetica", "bold");
-    doc.text(`Date of Invoice: `, 130, 60.5);
+    doc.text("Date of Invoice: ", 130, 60.5);
     doc.setFont("helvetica", "normal");
     doc.text(`${commonDataForPdf.dateOfInvoice}`, 154.6, 60.5);
 
@@ -201,13 +222,13 @@ const GeneratePDF = ({ invoiceData }) => {
     doc.text("AMOUNT", 169, startY + 5);
 
     resourcesArr.forEach((res, index) => {
+      console.log("res frm resource array ",res);
       const currentY = startY + 11 + index * rowHeight;
-      const temp = res.payPerDay * res.days;
       const remarkDaysText = res.remark_days ? ` (${res.remark_days})` : "";
-      const remarkOvertimeText = res.remark_overtime ? ` (${res.remark_overtime})` : "";
 
-      doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
+      doc.setFont("helvetica", "normal");
+
       doc.text(
         `Consultancy charges ${res.employeeName} on ${res.workingOn} (${res.userId})`,
         31.5,
@@ -215,35 +236,50 @@ const GeneratePDF = ({ invoiceData }) => {
       );
       doc.text(`(${res.fromDate} - ${res.toDate})`, 31.5, currentY + 3.3);
       doc.text(`${res.days} Days${remarkDaysText}`, 31.5, currentY + 6.7);
-      if (res.remark_overtime) {
-        doc.text(`OT:  ${res.remark_overtime}`, 31.5, currentY + 10);
-      }
-      doc.setFont("helvetica", "normal");
-      doc.text(temp.toString(), 173, currentY + 3.3);
-      doc.text(commonDataForPdf.currencyType, 165, currentY + 3.3);
+      if (res.remark_overtime)
+        doc.text(`OT: ${res.remark_overtime}`, 31.5, currentY + 10);
       doc.text(res.sacCode, 141, currentY + 3.3);
-      doc.text(`${commonDataForPdf.currencyType} ${res.payPerDay}`, 165, currentY + 6.7);
-      if (index < numRows - 1) { doc.line(30, currentY + 10, 195, currentY + 10); }
+      // doc.text(`${commonDataForPdf.currencyType} ${res.payPerDay}`, 165, currentY + 6.7); overtime amount
+      doc.text(res.totalAmount.toString(), 173, currentY + 3.3);
+
+      if (index < numRows - 1)
+        doc.line(30, currentY + 10, 195, currentY + 10);
     });
 
     // ---------- TOTALS ----------
     const subtotalY = totalTableHeight - 10;
-    const igstY = subtotalY + 7;
-    const totalY = igstY + 7;
+    const gst1Y = subtotalY + 7;
+    const gst2Y = gst1Y + 7;
+    const totalY = gst2Y + 7;
 
     doc.setFont("helvetica", "bold");
     doc.line(30, subtotalY - 9, 195, subtotalY - 9);
     doc.text("SUBTOTAL", 31.5, subtotalY - 5);
-    doc.line(30, subtotalY - 3, 195, subtotalY - 3);
     doc.text(totals.subTotal.toFixed(2), 173, subtotalY - 5);
     doc.text(commonDataForPdf.currencyType, 165, subtotalY - 5);
 
-    doc.text(`IGST ${commonDataForPdf.gstRate}`, 31.5, igstY - 6);
-    doc.text(totals.igst.toFixed(2), 173, igstY - 6);
-    doc.text(commonDataForPdf.currencyType, 165, igstY - 6);
+    /* ---- IGST Case ---- */
+    if (totals.gstType === "IGST") {
+      doc.text("IGST 18%", 31.5, gst1Y - 6);
+      doc.text(totals.igst.toFixed(2), 173, gst1Y - 6);
+      doc.text(commonDataForPdf.currencyType, 165, gst1Y - 6);
+    }
 
-    doc.setFont("helvetica", "bold");
-    doc.line(30, totalY - 11, 195, totalY - 11);
+    /* ---- CGST + SGST Case ---- */
+    if (totals.gstType === "CGST_SGST") {
+      doc.text("CGST 9%", 31.5, gst1Y - 6);
+      doc.text(totals.cgst.toFixed(2), 173, gst1Y - 6);
+
+      doc.text("SGST 9%", 31.5, gst2Y - 6);
+      doc.text(totals.sgst.toFixed(2), 173, gst2Y - 6);
+    }
+
+    /* ---- NO GST Case ---- */
+    if (totals.gstType === "NONE") {
+      // Skip GST rows
+    }
+
+    /* ---- TOTAL ---- */
     doc.text("TOTAL", 31.5, totalY - 6.5);
     doc.text(totals.total.toFixed(2), 173, totalY - 6.5);
     doc.text(commonDataForPdf.currencyType, 165, totalY - 6.5);
@@ -287,7 +323,6 @@ const GeneratePDF = ({ invoiceData }) => {
             <iframe
               src={pdfUrl}
               style={{ width: "100%", height: "100%" }}
-              frameBorder="0"
               title="PDF Preview"
             />
           </div>

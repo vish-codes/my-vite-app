@@ -513,37 +513,56 @@ const CreateInvoice = () => {
 
   // compute total amount for preview
   const computePreviewTotal = () => {
-    let total = 0;
+  let total = 0;
 
-    Object.keys(employeeInputs).forEach((eid) => {
-      const idNum = Number(eid);
-      if (!checkedEmployees.has(idNum)) return;
+  Object.keys(employeeInputs).forEach((eid) => {
+    const idNum = Number(eid);
+    if (!checkedEmployees.has(idNum)) return;
 
-      const vals = employeeInputs[eid] || {};
-      const days = Number(vals.days || 0);
-      const unpaid = Number(vals.unpaid_leaves || 0);
-      const overtime = Number(vals.over_time || 0);
+    const vals = employeeInputs[eid] || {};
+    const days = Number(vals.days || 0);
+    const unpaid = Number(vals.unpaid_leaves || 0);
+    const paidLeave = Number(vals.paid_leaves || 0);
+    const overtime = Number(vals.over_time || 0);
 
-      const payableDays = Math.max(0, days - unpaid);
+    const payableDays = Math.max(0, days + paidLeave - unpaid);
 
-      // 🔍 Find project for this employee
-      const project = projectsWithEmployees.find((p) =>
-        p.employees.some((e) => e.id === idNum)
-      );
+    // Find the project for the employee
+    const project = projectsWithEmployees.find((p) =>
+      p.employees.some((e) => e.id === idNum)
+    );
 
-      if (!project) return;
+    if (!project) return;
 
-      // ⬅️ Take project-based daily & overtime rates
-      const dailyRate = Number(project.billing_amt || 0);
-      const overtimeRate = Number(project.overtime_amt || 0);
+    const billingMethod = project.billing_method;
+    const rate = Number(project.billing_amt || 0);
+    const overtimeRate = Number(project.overtime_amt || 0);
 
-      // 💰 Calculate employee total based on project rates
-      total += payableDays * dailyRate + overtime * overtimeRate;
-    });
+    let employeeTotal = 0;
 
-    return total;
-  };
+    // ----------------------------
+    //  Billing Method Conditions
+    // ----------------------------
+    if (billingMethod === "days") {
+      // Per-day calculation
+      employeeTotal = payableDays * rate + overtime * overtimeRate;
 
+    } else if (billingMethod === "hours") {
+      // Per-hour calculation
+      const hoursWorked = Number(vals.hours || 0);  // Make sure your UI sends this
+      employeeTotal = hoursWorked * rate + overtime * overtimeRate;
+
+    } else if (billingMethod === "monthly") {
+      // Monthly salary (rate is the monthly amount)
+      // No multiplication by days — full salary + overtime
+      employeeTotal = rate + overtime * overtimeRate;
+    }
+
+    total += employeeTotal;
+  });
+
+  return total;
+};
 
   const columnDefs = [
     {
