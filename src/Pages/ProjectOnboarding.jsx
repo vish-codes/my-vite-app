@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, DollarSign, Clock, User, Hash } from "lucide-react";
+import { Plus, Trash2, Pencil, DollarSign, Clock, User, Hash } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
 import LoaderOverlay from "./LoaderOverlay";
 import toast, { Toaster } from "react-hot-toast";
@@ -29,19 +29,22 @@ const emptyForm = {
   active: true,
 };
 
+// <CHANGE> Updated ActionCellRenderer to use icon buttons
 const ActionCellRenderer = ({ data, onEdit, onDelete }) => (
-  <div className="flex gap-2 justify-end h-full items-center">
+  <div className="flex gap-1 justify-end h-full items-center">
     <button
       onClick={() => onEdit(data)}
-      className="inline-flex items-center gap-1 px-2.5 py-1 text-blue-600 hover:bg-blue-50 rounded text-xs font-medium transition-colors"
+      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+      title="Edit"
     >
-      Edit
+      <Pencil className="h-4 w-4" />
     </button>
     <button
       onClick={() => onDelete(data.id)}
-      className="inline-flex items-center gap-1 px-2.5 py-1 text-red-600 hover:bg-red-50 rounded text-xs font-medium transition-colors"
+      className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+      title="Delete"
     >
-      Delete
+      <Trash2 className="h-4 w-4" />
     </button>
   </div>
 );
@@ -295,6 +298,18 @@ const ProjectOnboarding = () => {
 
   const filteredProjects = projects;
 
+  const StatusCellRenderer = ({ value }) => (
+    <div className="flex items-center h-full">
+      <span
+        className={`px-2 py-0.5 text-xs font-medium rounded-md ${
+          value ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+        }`}
+      >
+        {value ? "Active" : "Inactive"}
+      </span>
+    </div>
+  );
+
   const columnDefs = [
     { field: "name", headerName: "Project Name", minWidth: 150, flex: 1 },
     {
@@ -320,7 +335,7 @@ const ProjectOnboarding = () => {
       headerName: "Status",
       minWidth: 100,
       flex: 1,
-      valueFormatter: (params) => (params.value ? "Active" : "Inactive"),
+      cellRenderer: StatusCellRenderer,
     },
     {
       field: "Actions",
@@ -678,20 +693,22 @@ const ProjectOnboarding = () => {
 
                 {/* Active Status */}
                 <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    name="active"
-                    id="active"
-                    checked={formData.active}
-                    onChange={handleChange}
-                    className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
-                  />
-                  <label
-                    htmlFor="active"
-                    className="text-xs font-medium text-slate-700"
-                  >
-                    Active Project
+                  <label className="text-xs font-medium text-slate-700">
+                    Status:
                   </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({ ...formData, active: !formData.active })
+                    }
+                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                      formData.active
+                        ? "bg-green-100 text-green-700 hover:bg-green-200"
+                        : "bg-red-100 text-red-700 hover:bg-red-200"
+                    }`}
+                  >
+                    {formData.active ? "Active" : "Inactive"}
+                  </button>
                 </div>
 
                 {/* Form Actions */}
