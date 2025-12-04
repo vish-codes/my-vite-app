@@ -74,40 +74,53 @@ const GeneratePDF = ({ invoiceData }) => {
     currencyType: "INR",
   };
 
-  const resourcesArr =
-    employeeEntries && employeeEntries.length > 0
-      ? employeeEntries.map((emp) => {
-          const project = projects?.find((p) =>
-            p.employees.some((e) => e.id === emp.employee_id)
-          );
+const resourcesArr =
+  employeeEntries && employeeEntries.length > 0
+    ? employeeEntries.map((emp) => {
+        const project = projects?.find((p) =>
+          p.employees.some((e) => e.id === emp.employee_id)
+        );
 
-          const empRaw = employeesRaw?.[String(emp.employee_id)] || {};
+        // Get employee’s own record inside the project
+        const empInsideProject = project?.employees.find(
+          (e) => e.id === emp.employee_id
+        );
 
-          const payPerDay = project?.billing_amt
-            ? Number(project.billing_amt)
-            : 0;
+        // Use billing amt from employee → NOT from project + NOT from employeeEntries
+        const payPerDay = empInsideProject?.billing_amt
+          ? Number(empInsideProject.billing_amt)
+          : 0;
 
-          const total = payPerDay * (emp.days || 0);
+        // Use overtime amt from employee inside project
+        const overtimeRate = empInsideProject?.overtime_amt
+          ? Number(empInsideProject.overtime_amt)
+          : 0;
 
-          return {
-            userId: emp.project_emp_code,
-            employeeName:
-              project?.employees.find((e) => e.id === emp.employee_id)?.name ||
-              "Employee",
-            workingOn: project?.project_name || "Project",
-            sacCode: "9983",
+        const overtimeAmount = overtimeRate * (emp.over_time || 0);
 
-            fromDate: formatToLongDate(commonDataForPdf.billingFrom),
-            toDate: formatToLongDate(commonDataForPdf.billingTo),
+        const total = payPerDay * (emp.days || 0) + overtimeAmount;
 
-            days: emp.days || 0,
-            payPerDay,
-            totalAmount: total,
-            remark_days: empRaw.remark_days || "",
-            remark_overtime: empRaw.remark_overtime || "",
-          };
-        })
-      : [];
+        return {
+          userId: emp.project_emp_code,
+          employeeName: empInsideProject?.name || "Employee",
+          workingOn: project?.project_name || "Project",
+          sacCode: "9983",
+
+          fromDate: formatToLongDate(commonDataForPdf.billingFrom),
+          toDate: formatToLongDate(commonDataForPdf.billingTo),
+
+          days: emp.days || 0,
+          payPerDay,
+          overtimeRate,
+          overtimeDays: emp.over_time || 0,
+          overtimeAmount,
+          totalAmount: total,
+
+          remark_days: emp.remark_days || "",
+          remark_overtime: emp.remark_overtime || "",
+        };
+      })
+    : [];
 
   /* ------------------ GST CALCULATION LOGIC ------------------ */
   const calculateTotals = (gstRateStr) => {
@@ -205,9 +218,9 @@ const GeneratePDF = ({ invoiceData }) => {
 
     // ---------- TABLE ----------
     const startY = 130;
-    const rowHeight = 18;
+    const rowHeight = 22;
     const numRows = resourcesArr.length;
-    const tableHeight = rowHeight * numRows + 25;
+    const tableHeight = rowHeight * numRows + 32;
     const totalTableHeight = startY + tableHeight;
 
     doc.rect(30, startY, 165, tableHeight);
@@ -222,7 +235,7 @@ const GeneratePDF = ({ invoiceData }) => {
     doc.text("AMOUNT", 169, startY + 5);
 
     resourcesArr.forEach((res, index) => {
-      console.log("res frm resource array ",res);
+      console.log("res frm resource array ", res);
       const currentY = startY + 11 + index * rowHeight;
       const remarkDaysText = res.remark_days ? ` (${res.remark_days})` : "";
 
@@ -237,10 +250,18 @@ const GeneratePDF = ({ invoiceData }) => {
       doc.text(`(${res.fromDate} - ${res.toDate})`, 31.5, currentY + 3.3);
       doc.text(`${res.days} Days${remarkDaysText}`, 31.5, currentY + 6.7);
       if (res.remark_overtime)
-        doc.text(`OT: ${res.remark_overtime}`, 31.5, currentY + 10);
+        doc.text(`${res.overtimeDays} OT: ${res.remark_overtime}`, 31.5, currentY + 10);
       doc.text(res.sacCode, 141, currentY + 3.3);
-      // doc.text(`${commonDataForPdf.currencyType} ${res.payPerDay}`, 165, currentY + 6.7); overtime amount
+      doc.text(`${commonDataForPdf.currencyType} ${res.overtimeAmount}`, 169, currentY + 10);
       doc.text(res.totalAmount.toString(), 173, currentY + 3.3);
+      // if (res.overtimeAmount > 0) {
+      //   doc.text(
+      //     `${res.overtimeDays} OT × ${res.overtimeRate} = ${res.overtimeAmount}`,
+      //     31.5,
+      //     currentY + 13.3
+      //   );
+      // }
+
 
       if (index < numRows - 1)
         doc.line(30, currentY + 10, 195, currentY + 10);
