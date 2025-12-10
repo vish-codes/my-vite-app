@@ -90,27 +90,22 @@ const GeneratePDF = ({ invoiceData }) => {
             p.employees.some((e) => e.id === emp.employee_id)
           );
 
-          // Employee’s record inside the project
           const empInsideProject = project?.employees.find(
             (e) => e.id === emp.employee_id
           );
 
-          // Billing method: "days" | "hours" | "month"
           const billingMethod =
             empInsideProject?.billing_method?.toLowerCase() ||
             emp.billing_method?.toLowerCase() ||
             "days";
 
-          // Base billing amount (monthly or per-day/hour depending on method)
           const billingAmt = Number(
             empInsideProject?.billing_amt || emp.billing_amt || 0
           );
 
-          // From form
-          const workingDays = Number(emp.days || 0); // working days entered
+          const workingDays = Number(emp.days || 0);
           const unpaidLeaves = Number(emp.unpaid_leaves || 0);
 
-          // Overtime
           const overtimeRate = Number(
             empInsideProject?.overtime_amt ||
               emp.overtime_amt ||
@@ -124,20 +119,16 @@ const GeneratePDF = ({ invoiceData }) => {
           let baseAmount = 0;
 
           if (billingMethod === "month") {
-            // perDaySal = billing_amt / workingDays (rounded)
             perDaySal =
               workingDays > 0 ? Math.round(billingAmt / workingDays) : 0;
-
-            // base = billing_amt - perDaySal * unpaidLeaves
             baseAmount = billingAmt - perDaySal * unpaidLeaves;
           } else {
-            // "days" / "hours" – existing behaviour
             perDaySal = billingAmt;
             baseAmount = perDaySal * workingDays;
           }
 
           baseAmount = Math.round(baseAmount);
-          const totalEmpAmount = baseAmount + overtimeAmount; // used for subtotal
+          const totalEmpAmount = baseAmount + overtimeAmount;
 
           return {
             userId: emp.project_emp_code,
@@ -193,6 +184,13 @@ const GeneratePDF = ({ invoiceData }) => {
   };
 
   const totals = calculateTotals(commonDataForPdf.gstRate);
+
+  const getRowHeight = (res) => {
+    let lines = 3;
+    if (res.overtimeDays > 0 || res.remark_overtime) lines += 1;
+    const lineHeight = 4.2;
+    return lines * lineHeight + 4;
+  };
 
   const generatePDF = (status) => {
     const doc = new jsPDF({
@@ -259,100 +257,130 @@ const GeneratePDF = ({ invoiceData }) => {
     doc.text(commonDataForPdf.clientGst, 43, 122);
 
     // ---------- TABLE ----------
-    const startY = 130;
-    const rowHeight = 22;
-    const numRows = resourcesArr.length;
-    const tableHeight = rowHeight * numRows + 32;
-    const totalTableHeight = startY + tableHeight;
-
-    doc.rect(30, startY, 165, tableHeight);
-    doc.line(30, startY + 7, 195, startY + 7);
-    doc.line(130, startY, 130, totalTableHeight);
-    doc.line(160, startY, 160, totalTableHeight);
-
+    const tableTopY = 130;
+    const TABLE_LEFT = 30;
+    const TABLE_WIDTH = 165;
+    const TABLE_RIGHT = TABLE_LEFT + TABLE_WIDTH;
+    const headerBottomY = tableTopY + 7;
     doc.setFontSize(10.5);
     doc.setFont("helvetica", "bold");
-    doc.text("DESCRIPTION", 66, startY + 5);
-    doc.text("SAC CODE", 135, startY + 5);
-    doc.text("AMOUNT", 169, startY + 5);
+    doc.text("DESCRIPTION", 66, tableTopY + 5);
+    doc.text("SAC CODE", 135, tableTopY + 5);
+    doc.text("AMOUNT", 169, tableTopY + 5);
+    doc.line(TABLE_LEFT, headerBottomY, TABLE_RIGHT, headerBottomY);
 
     // rows
-    resourcesArr.forEach((res, index) => {
-      const currentY = startY + 11 + index * rowHeight;
-      const remarkDaysText = res.remark_days
-        ? ` (${res.remark_days})`
-        : "";
+    let yCursor = headerBottomY;
+
+    resourcesArr.forEach((res) => {
+      const rowH = getRowHeight(res);
+      const baseY = yCursor + 4; // first line baseline
 
       doc.setFontSize(7.5);
       doc.setFont("helvetica", "normal");
 
+      const remarkDaysText = res.remark_days
+        ? ` (${res.remark_days})`
+        : "";
+
+      // DESCRIPTION
       doc.text(
         `Consultancy charges ${res.employeeName} on ${res.workingOn} (${res.userId})`,
-        31.5,
-        currentY
+        TABLE_LEFT + 1.5,
+        baseY
       );
-      doc.text(`(${res.fromDate} - ${res.toDate})`,31.5,currentY + 3.3);
-      doc.text(`${res.days} Days${remarkDaysText}`,31.5,currentY + 6.7);
-      if (res.overtimeDays > 0 && res.remark_overtime) 
-      {
-        doc.text(`${res.overtimeDays} OT (${res.remark_overtime})`,31.5,currentY + 10);
+      doc.text(
+        `(${res.fromDate} - ${res.toDate})`,
+        TABLE_LEFT + 1.5,
+        baseY + 3.5
+      );
+      doc.text(
+        `${res.days} Days${remarkDaysText}`,
+        TABLE_LEFT + 1.5,
+        baseY + 7
+      );
+      if (res.overtimeDays > 0 || res.remark_overtime) {
+        const otText =
+          res.overtimeDays > 0
+            ? `${res.overtimeDays} OT${
+                res.remark_overtime
+                  ? ` (${res.remark_overtime})`
+                  : ""
+              }`
+            : res.remark_overtime;
+        doc.text(otText, TABLE_LEFT + 1.5, baseY + 10.5);
       }
 
-      // SAC CODE column
-      doc.text(res.sacCode, 141, currentY + 3.3);
+      // SAC CODE
+      doc.text(res.sacCode, 141, baseY + 3.5);
 
-      const baseStr = `${commonDataForPdf.currencyType} ${formatINR(res.baseAmount)}`;
-      doc.text(baseStr, 169, currentY + 3);
-
-      if (res.overtimeAmount > 0) 
-      {
-        const otStr = `${commonDataForPdf.currencyType} ${formatINR(res.overtimeAmount)}`;
-        doc.text(otStr, 169, currentY + 10);
+      // AMOUNT
+      const curr = commonDataForPdf.currencyType;
+      doc.text(
+        `${curr} ${formatINR(res.baseAmount)}`,
+        169,
+        baseY + 3.5
+      );
+      if (res.overtimeAmount > 0) {
+        doc.text(
+          `${curr} ${formatINR(res.overtimeAmount)}`,
+          169,
+          baseY + 10.5
+        );
       }
 
-      // horizontal line at bottom of row
-      if (index < numRows - 1) {
-        const lineY = startY + (index + 1) * rowHeight;
-        doc.line(30, lineY, 195, lineY);
-      }
+      yCursor += rowH;
+      doc.line(TABLE_LEFT, yCursor, TABLE_RIGHT, yCursor);
     });
 
-    // ---------- TOTALS ----------
-    const subtotalY = totalTableHeight - 10;
-    const gst1Y = subtotalY + 7;
-    const gst2Y = gst1Y + 7;
-    const totalY = gst2Y + 7;
+    // ---------- TOTALS INSIDE TABLE ----------
+    const totalsRowHeight = 8;
+    const curr = commonDataForPdf.currencyType;
 
-    doc.setFont("helvetica", "bold");
-    doc.line(30, subtotalY - 9, 195, subtotalY - 9);
+    const addTotalRow = (label, value, bold = false) => {
+      const textY = yCursor + 5;
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.text(label, TABLE_LEFT + 1.5, textY);
+      doc.text(
+        `${curr} ${formatINR(value)}`,
+        165,
+        textY
+      );
+      yCursor += totalsRowHeight;
+      doc.line(TABLE_LEFT, yCursor, TABLE_RIGHT, yCursor);
+    };
 
     // SUBTOTAL
-    doc.text("SUBTOTAL", 31.5, subtotalY - 5);
-    doc.text(`${commonDataForPdf.currencyType} ${formatINR(totals.subTotal)}`,165,subtotalY - 5);
-
-    /* ---- IGST Case ---- */
-    if (totals.gstType === "IGST") {
-      doc.text("IGST 18%", 31.5, gst1Y - 6);
-      doc.text(`${commonDataForPdf.currencyType} ${formatINR(totals.igst)}`,165,gst1Y - 6);
-    }
-
-    /* ---- CGST + SGST Case ---- */
-    if (totals.gstType === "CGST_SGST") {
-      doc.text("CGST 9%", 31.5, gst1Y - 6);
-      doc.text(`${commonDataForPdf.currencyType} ${formatINR(totals.cgst)}`,165,gst1Y - 6);
-
-      doc.text("SGST 9%", 31.5, gst2Y - 6);
-      doc.text(`${commonDataForPdf.currencyType} ${formatINR(totals.sgst)}`,165,gst2Y - 6);
-    }
-
-    /* ---- TOTAL ---- */
     doc.setFont("helvetica", "bold");
-    doc.text("TOTAL", 31.5, totalY - 6.5);
-    doc.text(`${commonDataForPdf.currencyType} ${formatINR(totals.total)}`,165,totalY - 6.5);
+    addTotalRow("SUBTOTAL", totals.subTotal, false);
 
+    // TAX ROW(S)
+    if (totals.gstType === "IGST") {
+      addTotalRow("IGST 18%", totals.igst, false);
+    } else if (totals.gstType === "CGST_SGST") {
+      addTotalRow("CGST 9%", totals.cgst, false);
+      addTotalRow("SGST 9%", totals.sgst, false);
+    }
+
+    // TOTAL
+    addTotalRow("TOTAL", totals.total, true);
+
+    const tableBottomY = yCursor;
+
+    // outer border & column lines AFTER knowing bottom
+    doc.rect(
+      TABLE_LEFT,
+      tableTopY,
+      TABLE_WIDTH,
+      tableBottomY - tableTopY
+    );
+    doc.line(130, tableTopY, 130, tableBottomY);
+    doc.line(160, tableTopY, 160, tableBottomY);
+
+    // footer text
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text("Thanks for your business.", 28, totalY + 8);
+    doc.text("Thanks for your business.", 28, tableBottomY + 8);
 
     // ---------- PREVIEW ----------
     const pdfBlob = doc.output("blob");
