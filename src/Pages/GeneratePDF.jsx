@@ -10,6 +10,7 @@ const formatToDDMMYY = (dateStr) => {
   const year = String(d.getFullYear());
   return `${day}/${month}/${year}`;
 };
+
 const formatToLongDate = (dateStr) => {
   if (!dateStr) return "N/A";
 
@@ -21,33 +22,40 @@ const formatToLongDate = (dateStr) => {
   const getSuffix = (d) => {
     if (d > 3 && d < 21) return "th";
     switch (d % 10) {
-      case 1: return "st";
-      case 2: return "nd";
-      case 3: return "rd";
-      default: return "th";
+      case 1:
+        return "st";
+      case 2:
+        return "nd";
+      case 3:
+        return "rd";
+      default:
+        return "th";
     }
   };
 
   return `${day}${getSuffix(day)} ${month} ${year}`;
 };
 
+// INR formatter – 100000 => "1,00,000"
+const formatINR = (amount) => {
+  const num = Math.round(Number(amount || 0));
+  return new Intl.NumberFormat("en-IN", {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  }).format(num);
+};
 
 const GeneratePDF = ({ invoiceData }) => {
   const [pdfUrl, setPdfUrl] = useState("");
-
-  console.log("Invoice Data === ", invoiceData);
 
   useEffect(() => {
     if (invoiceData && Object.keys(invoiceData).length > 0) {
       generatePDF();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoiceData]);
 
-  const {
-    projects,
-    employeesRaw,
-    employeeEntries,
-  } = invoiceData || {};
+  const { projects, employeeEntries } = invoiceData || {};
 
   const commonDataForPdf = {
     invoiceNo: invoiceData?.invoice?.invoice_no || "N/A",
@@ -74,60 +82,94 @@ const GeneratePDF = ({ invoiceData }) => {
     currencyType: "INR",
   };
 
-const resourcesArr =
-  employeeEntries && employeeEntries.length > 0
-    ? employeeEntries.map((emp) => {
-        const project = projects?.find((p) =>
-          p.employees.some((e) => e.id === emp.employee_id)
-        );
+  /* ------------------ PER EMPLOYEE CALCULATION ------------------ */
+  const resourcesArr =
+    employeeEntries && employeeEntries.length > 0
+      ? employeeEntries.map((emp) => {
+          const project = projects?.find((p) =>
+            p.employees.some((e) => e.id === emp.employee_id)
+          );
 
-        // Get employee’s own record inside the project
-        const empInsideProject = project?.employees.find(
-          (e) => e.id === emp.employee_id
-        );
+          // Employee’s record inside the project
+          const empInsideProject = project?.employees.find(
+            (e) => e.id === emp.employee_id
+          );
 
-        // Use billing amt from employee → NOT from project + NOT from employeeEntries
-        const payPerDay = empInsideProject?.billing_amt
-          ? Number(empInsideProject.billing_amt)
-          : 0;
+          // Billing method: "days" | "hours" | "month"
+          const billingMethod =
+            empInsideProject?.billing_method?.toLowerCase() ||
+            emp.billing_method?.toLowerCase() ||
+            "days";
 
-        // Use overtime amt from employee inside project
-        const overtimeRate = empInsideProject?.overtime_amt
-          ? Number(empInsideProject.overtime_amt)
-          : 0;
+          // Base billing amount (monthly or per-day/hour depending on method)
+          const billingAmt = Number(
+            empInsideProject?.billing_amt || emp.billing_amt || 0
+          );
 
-        const overtimeAmount = overtimeRate * (emp.over_time || 0);
+          // From form
+          const workingDays = Number(emp.days || 0); // working days entered
+          const unpaidLeaves = Number(emp.unpaid_leaves || 0);
 
-        const total = payPerDay * (emp.days || 0) + overtimeAmount;
+          // Overtime
+          const overtimeRate = Number(
+            empInsideProject?.overtime_amt ||
+              emp.overtime_amt ||
+              emp.overtime_rate ||
+              0
+          );
+          const overtimeDays = Number(emp.over_time || 0);
+          const overtimeAmount = Math.round(overtimeRate * overtimeDays);
 
-        return {
-          userId: emp.project_emp_code,
-          employeeName: empInsideProject?.name || "Employee",
-          workingOn: project?.project_name || "Project",
-          sacCode: "9983",
+          let perDaySal = 0;
+          let baseAmount = 0;
 
-          fromDate: formatToLongDate(commonDataForPdf.billingFrom),
-          toDate: formatToLongDate(commonDataForPdf.billingTo),
+          if (billingMethod === "month") {
+            // perDaySal = billing_amt / workingDays (rounded)
+            perDaySal =
+              workingDays > 0 ? Math.round(billingAmt / workingDays) : 0;
 
-          days: emp.days || 0,
-          payPerDay,
-          overtimeRate,
-          overtimeDays: emp.over_time || 0,
-          overtimeAmount,
-          totalAmount: total,
+            // base = billing_amt - perDaySal * unpaidLeaves
+            baseAmount = billingAmt - perDaySal * unpaidLeaves;
+          } else {
+            // "days" / "hours" – existing behaviour
+            perDaySal = billingAmt;
+            baseAmount = perDaySal * workingDays;
+          }
 
-          remark_days: emp.remark_days || "",
-          remark_overtime: emp.remark_overtime || "",
-        };
-      })
-    : [];
+          baseAmount = Math.round(baseAmount);
+          const totalEmpAmount = baseAmount + overtimeAmount; // used for subtotal
+
+          return {
+            userId: emp.project_emp_code,
+            employeeName: empInsideProject?.name || "Employee",
+            workingOn: project?.project_name || "Project",
+            sacCode: "9983",
+
+            fromDate: formatToLongDate(commonDataForPdf.billingFrom),
+            toDate: formatToLongDate(commonDataForPdf.billingTo),
+
+            days: workingDays,
+            unpaidLeaves,
+            payPerDay: perDaySal,
+            baseAmount,
+            overtimeRate,
+            overtimeDays,
+            overtimeAmount,
+            totalEmpAmount,
+
+            remark_days: emp.remark_days || "",
+            remark_overtime: emp.remark_overtime || "",
+          };
+        })
+      : [];
 
   /* ------------------ GST CALCULATION LOGIC ------------------ */
   const calculateTotals = (gstRateStr) => {
-    const subTotal = resourcesArr.reduce(
-      (acc, val) => acc + val.totalAmount,
+    const rawSubTotal = resourcesArr.reduce(
+      (acc, val) => acc + val.totalEmpAmount,
       0
     );
+    const subTotal = Math.round(rawSubTotal);
 
     let gstType = "NONE";
     let igst = 0;
@@ -138,11 +180,11 @@ const resourcesArr =
       gstType = "NONE";
     } else if (gstRateStr === "18%") {
       gstType = "IGST";
-      igst = (subTotal * 18) / 100;
+      igst = Math.round((subTotal * 18) / 100);
     } else if (gstRateStr === "9% + 9%") {
       gstType = "CGST_SGST";
-      cgst = (subTotal * 9) / 100;
-      sgst = (subTotal * 9) / 100;
+      cgst = Math.round((subTotal * 9) / 100);
+      sgst = Math.round((subTotal * 9) / 100);
     }
 
     const total = subTotal + igst + cgst + sgst;
@@ -234,10 +276,12 @@ const resourcesArr =
     doc.text("SAC CODE", 135, startY + 5);
     doc.text("AMOUNT", 169, startY + 5);
 
+    // rows
     resourcesArr.forEach((res, index) => {
-      console.log("res frm resource array ", res);
       const currentY = startY + 11 + index * rowHeight;
-      const remarkDaysText = res.remark_days ? ` (${res.remark_days})` : "";
+      const remarkDaysText = res.remark_days
+        ? ` (${res.remark_days})`
+        : "";
 
       doc.setFontSize(7.5);
       doc.setFont("helvetica", "normal");
@@ -247,24 +291,30 @@ const resourcesArr =
         31.5,
         currentY
       );
-      doc.text(`(${res.fromDate} - ${res.toDate})`, 31.5, currentY + 3.3);
-      doc.text(`${res.days} Days${remarkDaysText}`, 31.5, currentY + 6.7);
-      if (res.remark_overtime)
-        doc.text(`${res.overtimeDays} OT: ${res.remark_overtime}`, 31.5, currentY + 10);
+      doc.text(`(${res.fromDate} - ${res.toDate})`,31.5,currentY + 3.3);
+      doc.text(`${res.days} Days${remarkDaysText}`,31.5,currentY + 6.7);
+      if (res.overtimeDays > 0 && res.remark_overtime) 
+      {
+        doc.text(`${res.overtimeDays} OT (${res.remark_overtime})`,31.5,currentY + 10);
+      }
+
+      // SAC CODE column
       doc.text(res.sacCode, 141, currentY + 3.3);
-      doc.text(`${commonDataForPdf.currencyType} ${res.overtimeAmount}`, 169, currentY + 10);
-      doc.text(res.totalAmount.toString(), 173, currentY + 3.3);
-      // if (res.overtimeAmount > 0) {
-      //   doc.text(
-      //     `${res.overtimeDays} OT × ${res.overtimeRate} = ${res.overtimeAmount}`,
-      //     31.5,
-      //     currentY + 13.3
-      //   );
-      // }
 
+      const baseStr = `${commonDataForPdf.currencyType} ${formatINR(res.baseAmount)}`;
+      doc.text(baseStr, 169, currentY + 3);
 
-      if (index < numRows - 1)
-        doc.line(30, currentY + 10, 195, currentY + 10);
+      if (res.overtimeAmount > 0) 
+      {
+        const otStr = `${commonDataForPdf.currencyType} ${formatINR(res.overtimeAmount)}`;
+        doc.text(otStr, 169, currentY + 10);
+      }
+
+      // horizontal line at bottom of row
+      if (index < numRows - 1) {
+        const lineY = startY + (index + 1) * rowHeight;
+        doc.line(30, lineY, 195, lineY);
+      }
     });
 
     // ---------- TOTALS ----------
@@ -275,35 +325,30 @@ const resourcesArr =
 
     doc.setFont("helvetica", "bold");
     doc.line(30, subtotalY - 9, 195, subtotalY - 9);
+
+    // SUBTOTAL
     doc.text("SUBTOTAL", 31.5, subtotalY - 5);
-    doc.text(totals.subTotal.toFixed(2), 173, subtotalY - 5);
-    doc.text(commonDataForPdf.currencyType, 165, subtotalY - 5);
+    doc.text(`${commonDataForPdf.currencyType} ${formatINR(totals.subTotal)}`,165,subtotalY - 5);
 
     /* ---- IGST Case ---- */
     if (totals.gstType === "IGST") {
       doc.text("IGST 18%", 31.5, gst1Y - 6);
-      doc.text(totals.igst.toFixed(2), 173, gst1Y - 6);
-      doc.text(commonDataForPdf.currencyType, 165, gst1Y - 6);
+      doc.text(`${commonDataForPdf.currencyType} ${formatINR(totals.igst)}`,165,gst1Y - 6);
     }
 
     /* ---- CGST + SGST Case ---- */
     if (totals.gstType === "CGST_SGST") {
       doc.text("CGST 9%", 31.5, gst1Y - 6);
-      doc.text(totals.cgst.toFixed(2), 173, gst1Y - 6);
+      doc.text(`${commonDataForPdf.currencyType} ${formatINR(totals.cgst)}`,165,gst1Y - 6);
 
       doc.text("SGST 9%", 31.5, gst2Y - 6);
-      doc.text(totals.sgst.toFixed(2), 173, gst2Y - 6);
-    }
-
-    /* ---- NO GST Case ---- */
-    if (totals.gstType === "NONE") {
-      // Skip GST rows
+      doc.text(`${commonDataForPdf.currencyType} ${formatINR(totals.sgst)}`,165,gst2Y - 6);
     }
 
     /* ---- TOTAL ---- */
+    doc.setFont("helvetica", "bold");
     doc.text("TOTAL", 31.5, totalY - 6.5);
-    doc.text(totals.total.toFixed(2), 173, totalY - 6.5);
-    doc.text(commonDataForPdf.currencyType, 165, totalY - 6.5);
+    doc.text(`${commonDataForPdf.currencyType} ${formatINR(totals.total)}`,165,totalY - 6.5);
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
@@ -319,9 +364,7 @@ const resourcesArr =
     }
   };
 
-  // --------------------------
-  // UI
-  // --------------------------
+  // -------------------------- UI --------------------------
   return (
     <div className="w-full">
       {pdfUrl ? (
