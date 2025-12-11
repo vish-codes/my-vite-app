@@ -274,7 +274,7 @@ const GeneratePDF = ({ invoiceData }) => {
     // ---------- BILL TO ----------
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
-    doc.text("BILL TO", 34, 85.5).rect(32, 81, 52, 7);
+    doc.text("BILL TO", 32, 85.5).rect(30, 81, 52, 7);
     doc.setFontSize(10);
 
     // Client name
@@ -301,7 +301,7 @@ const GeneratePDF = ({ invoiceData }) => {
     const TABLE_WIDTH = 165;
     const TABLE_RIGHT = TABLE_LEFT + TABLE_WIDTH;
 
-    const tableTopY = billToBottomY + 8;
+    const tableTopY = billToBottomY + 1;
     const headerBottomY = tableTopY + 7;
 
     doc.setFontSize(10.5);
@@ -384,7 +384,7 @@ const GeneratePDF = ({ invoiceData }) => {
       doc.text(label, TABLE_LEFT + 1.5, textY);
       doc.text(
         `${curr} ${formatINR(value)}`,
-        165,
+        169,
         textY
       );
       yCursor += totalsRowHeight;
