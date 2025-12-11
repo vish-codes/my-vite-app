@@ -301,9 +301,8 @@ const ProjectOnboarding = () => {
   const StatusCellRenderer = ({ value }) => (
     <div className="flex items-center h-full">
       <span
-        className={`px-2 py-0.5 text-xs font-medium rounded-md ${
-          value ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-        }`}
+        className={`px-2 py-0.5 text-xs font-medium rounded-md ${value ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+          }`}
       >
         {value ? "Active" : "Inactive"}
       </span>
@@ -443,11 +442,10 @@ const ProjectOnboarding = () => {
                       value={formData.name}
                       onChange={handleChange}
                       placeholder="Enter project name"
-                      className={`w-full px-2.5 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${
-                        validationErrors.name
+                      className={`w-full px-2.5 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${validationErrors.name
                           ? "border-red-400 bg-red-50"
                           : "border-slate-300 bg-white"
-                      }`}
+                        }`}
                     />
                     {validationErrors.name && (
                       <p className="text-red-500 text-xs mt-0.5">
@@ -465,11 +463,10 @@ const ProjectOnboarding = () => {
                       name="client_id"
                       value={formData.client_id}
                       onChange={handleChange}
-                      className={`w-full px-2.5 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${
-                        validationErrors.client_id
+                      className={`w-full px-2.5 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${validationErrors.client_id
                           ? "border-red-400 bg-red-50"
                           : "border-slate-300 bg-white"
-                      }`}
+                        }`}
                     >
                       <option value="">Select Client</option>
                       {clients.map((client) => (
@@ -550,11 +547,10 @@ const ProjectOnboarding = () => {
                                     e.target.value
                                   )
                                 }
-                                className={`w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${
-                                  validationErrors[`emp_id_${index}`]
+                                className={`w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${validationErrors[`emp_id_${index}`]
                                     ? "border-red-400 bg-red-50"
                                     : "border-slate-300 bg-white"
-                                }`}
+                                  }`}
                               >
                                 <option value="">Select</option>
                                 {employees.map((empOpt) => (
@@ -607,48 +603,43 @@ const ProjectOnboarding = () => {
                                 Base Rate
                               </label>
                               <div className="relative">
-                                <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+                                  ₹
+                                </span>
+
                                 <input
                                   type="number"
                                   value={emp.billing_amt}
                                   onChange={(e) =>
-                                    handleEmployeeChange(
-                                      index,
-                                      "billing_amt",
-                                      e.target.value
-                                    )
+                                    handleEmployeeChange(index, "billing_amt", e.target.value)
                                   }
                                   placeholder="0"
-                                  className={`w-full pl-6 pr-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${
-                                    validationErrors[`billing_amt_${index}`]
+                                  className={`w-full pl-6 pr-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${validationErrors[`billing_amt_${index}`]
                                       ? "border-red-400 bg-red-50"
                                       : "border-slate-300 bg-white"
-                                  }`}
+                                    }`}
                                 />
                               </div>
                               {validationErrors[`billing_amt_${index}`] && (
-                                <p className="text-red-500 text-[10px] mt-0.5">
-                                  Required
-                                </p>
+                                <p className="text-red-500 text-[10px] mt-0.5">Required</p>
                               )}
                             </div>
 
                             {/* Overtime Amount */}
                             <div className="flex-1 min-w-[100px]">
                               <label className="block text-[10px] uppercase tracking-wide font-medium text-slate-500 mb-1">
-                                Overtime
+                                Overtime Amount
                               </label>
                               <div className="relative">
-                                <Clock className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+                                  ₹
+                                </span>
+
                                 <input
                                   type="number"
                                   value={emp.overtime_amt}
                                   onChange={(e) =>
-                                    handleEmployeeChange(
-                                      index,
-                                      "overtime_amt",
-                                      e.target.value
-                                    )
+                                    handleEmployeeChange(index, "overtime_amt", e.target.value)
                                   }
                                   placeholder="0"
                                   className="w-full pl-6 pr-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 transition bg-white"
@@ -673,11 +664,10 @@ const ProjectOnboarding = () => {
                                         method
                                       )
                                     }
-                                    className={`flex-1 px-1.5 py-1.5 text-[10px] font-medium capitalize transition-colors ${
-                                      emp.billing_method === method
+                                    className={`flex-1 px-1.5 py-1.5 text-[10px] font-medium capitalize transition-colors ${emp.billing_method === method
                                         ? "bg-blue-600 text-white"
                                         : "bg-white text-slate-600 hover:bg-slate-50"
-                                    }`}
+                                      }`}
                                   >
                                     {method === "fixed" ? "Month" : method}
                                   </button>
@@ -701,11 +691,10 @@ const ProjectOnboarding = () => {
                     onClick={() =>
                       setFormData({ ...formData, active: !formData.active })
                     }
-                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                      formData.active
+                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${formData.active
                         ? "bg-green-100 text-green-700 hover:bg-green-200"
                         : "bg-red-100 text-red-700 hover:bg-red-200"
-                    }`}
+                      }`}
                   >
                     {formData.active ? "Active" : "Inactive"}
                   </button>

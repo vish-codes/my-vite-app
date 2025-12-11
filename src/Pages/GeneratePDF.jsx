@@ -45,6 +45,34 @@ const formatINR = (amount) => {
   }).format(num);
 };
 
+const formatClientAddressLines = (client) => {
+  const address = client?.address || "";
+  if (!address) return [];
+
+  const parts = address
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (parts.length < 4) {
+    return [address];
+  }
+
+  const lines = [];
+  lines.push(parts.slice(0, 4).join(", "));
+  if (parts[4]) {
+    lines.push(parts[4]);
+  }
+
+  if (parts[5] && parts[6]) {
+    lines.push(`${parts[5]}, ${parts[6]}`);
+  } else if (parts[5]) {
+    lines.push(parts[5]);
+  }
+
+  return lines;
+};
+
 const GeneratePDF = ({ invoiceData }) => {
   const [pdfUrl, setPdfUrl] = useState("");
 
@@ -52,7 +80,6 @@ const GeneratePDF = ({ invoiceData }) => {
     if (invoiceData && Object.keys(invoiceData).length > 0) {
       generatePDF();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoiceData]);
 
   const { projects, employeeEntries } = invoiceData || {};
@@ -77,7 +104,6 @@ const GeneratePDF = ({ invoiceData }) => {
     clientState: invoiceData?.client?.client_state || "N/A",
     clientGst: invoiceData?.client?.gst_number || "N/A",
 
-    add2: "Gurgaon, Haryana - 122001",
     gstRate: invoiceData?.client?.tax_rate || "N/A",
     currencyType: "INR",
   };
@@ -179,11 +205,12 @@ const GeneratePDF = ({ invoiceData }) => {
     }
 
     const total = subTotal + igst + cgst + sgst;
-
+// TODO
     return { subTotal, igst, cgst, sgst, total, gstType };
   };
 
   const totals = calculateTotals(commonDataForPdf.gstRate);
+
 
   const getRowHeight = (res) => {
     let lines = 3;
@@ -249,19 +276,34 @@ const GeneratePDF = ({ invoiceData }) => {
     doc.setFontSize(8);
     doc.text("BILL TO", 34, 85.5).rect(32, 81, 52, 7);
     doc.setFontSize(10);
+
+    // Client name
     doc.text(commonDataForPdf.clientName, 30, 98);
-    doc.setFontSize(9);
-    doc.text(commonDataForPdf.clientAddress, 30, 106);
-    doc.text(commonDataForPdf.add2, 30, 110);
-    doc.text("GSTIN: ", 30, 122);
-    doc.text(commonDataForPdf.clientGst, 43, 122);
+
+    // Address lines
+    let lineY = 104;
+    const addressLines = formatClientAddressLines(invoiceData?.client);
+    addressLines.forEach((line) => {
+      doc.text(line, 30, lineY);
+      lineY += 5;
+    });
+
+    // GSTIN line
+    lineY += 2;
+    doc.setFont("helvetica", "bold");
+    doc.text("GSTIN :", 30, lineY);
+    doc.text(commonDataForPdf.clientGst || "N/A", 50, lineY);
+
+    const billToBottomY = lineY + 6;
 
     // ---------- TABLE ----------
-    const tableTopY = 130;
     const TABLE_LEFT = 30;
     const TABLE_WIDTH = 165;
     const TABLE_RIGHT = TABLE_LEFT + TABLE_WIDTH;
+
+    const tableTopY = billToBottomY + 8; 
     const headerBottomY = tableTopY + 7;
+
     doc.setFontSize(10.5);
     doc.setFont("helvetica", "bold");
     doc.text("DESCRIPTION", 66, tableTopY + 5);
@@ -274,7 +316,7 @@ const GeneratePDF = ({ invoiceData }) => {
 
     resourcesArr.forEach((res) => {
       const rowH = getRowHeight(res);
-      const baseY = yCursor + 4; // first line baseline
+      const baseY = yCursor + 4;
 
       doc.setFontSize(7.5);
       doc.setFont("helvetica", "normal");
@@ -351,7 +393,6 @@ const GeneratePDF = ({ invoiceData }) => {
     };
 
     // SUBTOTAL
-    doc.setFont("helvetica", "bold");
     addTotalRow("SUBTOTAL", totals.subTotal, false);
 
     // TAX ROW(S)

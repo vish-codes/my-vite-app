@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { Plus } from "lucide-react"
+import { Plus, Trash2, Pencil } from "lucide-react"
 import { AgGridReact } from "ag-grid-react"
 import "ag-grid-community/styles/ag-grid.css"
 import "ag-grid-community/styles/ag-theme-quartz.css"
@@ -29,12 +29,12 @@ const ActionCellRenderer = ({ data, onEdit, onDelete }) => (
       onClick={() => onEdit(data)}
       className="inline-flex items-center gap-1 px-3 py-1 text-blue-600 hover:bg-blue-50 rounded transition-colors font-medium text-sm"
     >
-      Edit
+      <Pencil className="h-4 w-4" />
     </button>
-    <Trash
+    <button
       onClick={() => onDelete(data.invoice_id)}
       className="cursor-pointer text-red-500"
-    />
+    ><Trash2 className="h-4 w-4" /></button>
   </div>
 );
 
@@ -310,7 +310,7 @@ const CreateInvoice = () => {
       // 2 - build employee_entries
       const employee_entries = [];
       Object.keys(employeeInputs).forEach((eid) => {
-        const idNum = Number(eid);
+        const idNum = Number(eid);  
         if (checkedEmployees.has(idNum)) {
           const vals = employeeInputs[eid] || {};
           // Find employee full data from normalized projects
@@ -513,56 +513,56 @@ const CreateInvoice = () => {
 
   // compute total amount for preview
   const computePreviewTotal = () => {
-  let total = 0;
+    let total = 0;
 
-  Object.keys(employeeInputs).forEach((eid) => {
-    const idNum = Number(eid);
-    if (!checkedEmployees.has(idNum)) return;
+    Object.keys(employeeInputs).forEach((eid) => {
+      const idNum = Number(eid);
+      if (!checkedEmployees.has(idNum)) return;
 
-    const vals = employeeInputs[eid] || {};
-    const days = Number(vals.days || 0);
-    const unpaid = Number(vals.unpaid_leaves || 0);
-    const paidLeave = Number(vals.paid_leaves || 0);
-    const overtime = Number(vals.over_time || 0);
+      const vals = employeeInputs[eid] || {};
+      const days = Number(vals.days || 0);
+      const unpaid = Number(vals.unpaid_leaves || 0);
+      const paidLeave = Number(vals.paid_leaves || 0);
+      const overtime = Number(vals.over_time || 0);
 
-    const payableDays = Math.max(0, days + paidLeave - unpaid);
+      const payableDays = Math.max(0, days + paidLeave - unpaid);
 
-    // Find the project for the employee
-    const project = projectsWithEmployees.find((p) =>
-      p.employees.some((e) => e.id === idNum)
-    );
+      // Find the project for the employee
+      const project = projectsWithEmployees.find((p) =>
+        p.employees.some((e) => e.id === idNum)
+      );
 
-    if (!project) return;
+      if (!project) return;
 
-    const billingMethod = project.billing_method;
-    const rate = Number(project.billing_amt || 0);
-    const overtimeRate = Number(project.overtime_amt || 0);
+      const billingMethod = project.billing_method;
+      const rate = Number(project.billing_amt || 0);
+      const overtimeRate = Number(project.overtime_amt || 0);
 
-    let employeeTotal = 0;
+      let employeeTotal = 0;
 
-    // ----------------------------
-    //  Billing Method Conditions
-    // ----------------------------
-    if (billingMethod === "days") {
-      // Per-day calculation
-      employeeTotal = payableDays * rate + overtime * overtimeRate;
+      // ----------------------------
+      //  Billing Method Conditions
+      // ----------------------------
+      if (billingMethod === "days") {
+        // Per-day calculation
+        employeeTotal = payableDays * rate + overtime * overtimeRate;
 
-    } else if (billingMethod === "hours") {
-      // Per-hour calculation
-      const hoursWorked = Number(vals.hours || 0);  // Make sure your UI sends this
-      employeeTotal = hoursWorked * rate + overtime * overtimeRate;
+      } else if (billingMethod === "hours") {
+        // Per-hour calculation
+        const hoursWorked = Number(vals.hours || 0);  // Make sure your UI sends this
+        employeeTotal = hoursWorked * rate + overtime * overtimeRate;
 
-    } else if (billingMethod === "monthly") {
-      // Monthly salary (rate is the monthly amount)
-      // No multiplication by days — full salary + overtime
-      employeeTotal = rate + overtime * overtimeRate;
-    }
+      } else if (billingMethod === "monthly") {
+        // Monthly salary (rate is the monthly amount)
+        // No multiplication by days — full salary + overtime
+        employeeTotal = rate + overtime * overtimeRate;
+      }
 
-    total += employeeTotal;
-  });
+      total += employeeTotal;
+    });
 
-  return total;
-};
+    return total;
+  };
 
   const columnDefs = [
     {
@@ -1117,7 +1117,6 @@ const CreateInvoice = () => {
                 pagination={true}
                 paginationPageSize={10}
                 paginationPageSizeSelector={[10, 20, 50, 100]}
-                rowSelection={{ mode: "single" }}
                 animateRows={true}
                 onGridReady={onGridReady}
                 ref={gridApiRef}

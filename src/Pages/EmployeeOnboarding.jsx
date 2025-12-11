@@ -73,40 +73,40 @@ const EmployeeOnboarding = () => {
     }
   }
 
-const validateForm = () => {
-  const errors = {}
+  const validateForm = () => {
+    const errors = {}
 
-  const nameVal = (formData.name || "").trim()
-  if (!nameVal) {
-    errors.name = "Employee name is required"
-  } else {
-    const namePattern = /^[A-Za-z\s]+$/
-    if (!namePattern.test(nameVal)) {
-      errors.name = "Name can only contain alphabets and spaces"
-    } else if (nameVal.length > 80) {
-      errors.name = "Name must be 80 characters or less"
+    const nameVal = (formData.name || "").trim()
+    if (!nameVal) {
+      errors.name = "Employee name is required"
+    } else {
+      const namePattern = /^[A-Za-z\s]+$/
+      if (!namePattern.test(nameVal)) {
+        errors.name = "Name can only contain alphabets and spaces"
+      } else if (nameVal.length > 80) {
+        errors.name = "Name must be 80 characters or less"
+      }
     }
-  }
 
-  if (!formData.position.trim()) errors.position = "Position is required"
-  if (!formData.working_on.trim()) errors.working_on = "Working on is required"
-  const code = (formData.emp_code || "").toString().trim().toUpperCase()
-  if (!code) {
-    errors.emp_code = "Employee code is required (format: PSS123)"
-  } else if (!/^PSS\d+$/.test(code)) {
-    errors.emp_code = "Employee code must start with 'PSS' followed by digits (e.g. PSS105)"
-  } else {
-    const duplicate = employees.some(
-      (emp) =>
-        emp.emp_code?.toString().trim().toUpperCase() === code &&
-        emp.id !== editingId
-    )
-    if (duplicate) errors.emp_code = "This employee code is already in use"
-  }
+    if (!formData.position.trim()) errors.position = "Position is required"
+    if (!formData.working_on.trim()) errors.working_on = "Working on is required"
+    const code = (formData.emp_code || "").toString().trim().toUpperCase()
+    if (!code) {
+      errors.emp_code = "Employee code is required (format: PSS123)"
+    } else if (!/^PSS\d+$/.test(code)) {
+      errors.emp_code = "Employee code must start with 'PSS' followed by digits (e.g. PSS105)"
+    } else {
+      const duplicate = employees.some(
+        (emp) =>
+          emp.emp_code?.toString().trim().toUpperCase() === code &&
+          emp.id !== editingId
+      )
+      if (duplicate) errors.emp_code = "This employee code is already in use"
+    }
 
-  setValidationErrors(errors)
-  return Object.keys(errors).length === 0
-}
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
 
   const handleOpenForm = () => {
     setFormData(emptyForm)
@@ -129,34 +129,34 @@ const validateForm = () => {
     setValidationErrors({})
   }
 
-const handleChange = (e) => {
-  const { name, value } = e.target
+  const handleChange = (e) => {
+    const { name, value } = e.target
 
-  if (name === "emp_code") {
-    const normalized = value.toString().toUpperCase().replace(/\s+/g, "")
-    setFormData({ ...formData, [name]: normalized })
-    if (validationErrors[name]) {
-      setValidationErrors({ ...validationErrors, [name]: "" })
+    if (name === "emp_code") {
+      const normalized = value.toString().toUpperCase().replace(/\s+/g, "")
+      setFormData({ ...formData, [name]: normalized })
+      if (validationErrors[name]) {
+        setValidationErrors({ ...validationErrors, [name]: "" })
+      }
+      return
     }
-    return
-  }
 
-  if (name === "name") {
-    const namePattern = /^[A-Za-z\s]*$/
-    if (!namePattern.test(value)) {
-      setValidationErrors((prev) => ({
-        ...prev,
-        name: "Name can only contain alphabets and spaces",
-      }))
-    } else {
-      if (validationErrors.name) {
-        setValidationErrors({ ...validationErrors, name: "" })
+    if (name === "name") {
+      const namePattern = /^[A-Za-z\s]*$/
+      if (!namePattern.test(value)) {
+        setValidationErrors((prev) => ({
+          ...prev,
+          name: "Name can only contain alphabets and spaces",
+        }))
+      } else {
+        if (validationErrors.name) {
+          setValidationErrors({ ...validationErrors, name: "" })
+        }
       }
     }
-  }
 
-  setFormData({ ...formData, [name]: value })
-}
+    setFormData({ ...formData, [name]: value })
+  }
 
 
   const handleFormSubmit = (e) => {
@@ -166,8 +166,8 @@ const handleChange = (e) => {
       ...formData,
       emp_code: (formData.emp_code || "").toString().trim().toUpperCase(),
     }
-     setFormData(normalizedForm)
-   const errors = {}
+    setFormData(normalizedForm)
+    const errors = {}
     if (!normalizedForm.name.trim()) errors.name = "Employee name is required"
     if (!normalizedForm.position.trim()) errors.position = "Position is required"
     if (!normalizedForm.working_on.trim()) errors.working_on = "Working on is required"
@@ -378,9 +378,8 @@ const handleChange = (e) => {
                       value={formData.name}
                       onChange={handleChange}
                       placeholder="Enter employee name"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.name ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${validationErrors.name ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                        }`}
                     />
                     {validationErrors.name && <p className="text-red-600 text-sm mt-1">{validationErrors.name}</p>}
                   </div>
@@ -396,9 +395,8 @@ const handleChange = (e) => {
                       value={formData.position}
                       onChange={handleChange}
                       placeholder="Enter position"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.position ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${validationErrors.position ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                        }`}
                     />
                     {validationErrors.position && (
                       <p className="text-red-600 text-sm mt-1">{validationErrors.position}</p>
@@ -416,9 +414,8 @@ const handleChange = (e) => {
                       value={formData.working_on}
                       onChange={handleChange}
                       placeholder="Project/Department"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.working_on ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${validationErrors.working_on ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                        }`}
                     />
                     {validationErrors.working_on && (
                       <p className="text-red-600 text-sm mt-1">{validationErrors.working_on}</p>
@@ -436,9 +433,8 @@ const handleChange = (e) => {
                       value={formData.emp_code}
                       onChange={handleChange}
                       placeholder="Enter employee code"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                        validationErrors.emp_code ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${validationErrors.emp_code ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
+                        }`}
                     />
                     {validationErrors.emp_code && <p className="text-red-600 text-sm mt-1">{validationErrors.emp_code}</p>}
                   </div>
