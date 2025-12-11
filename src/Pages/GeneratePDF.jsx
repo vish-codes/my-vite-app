@@ -243,10 +243,10 @@ const GeneratePDF = ({ invoiceData }) => {
     doc.text("Noida, Uttar Pradesh - 201305", 30, 50);
 
     // ---------- BANK DETAILS ----------
-    doc.rect(30, 56, 170, 20);
+    doc.rect(30, 56, 165, 20);
     doc.line(110, 56, 110, 76);
-    doc.line(110, 62, 200, 62);
-    doc.line(110, 69, 200, 69);
+    doc.line(110, 62, 195, 62);
+    doc.line(110, 69, 195, 69);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.text("Bank Details:", 32, 60.5);
