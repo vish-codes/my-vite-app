@@ -4,6 +4,7 @@ import Heading from "../Components/Heading";
 import { useContext, useEffect, useState } from "react";
 import { AppContext } from "../App";
 import LoaderMain from "../Components/LoaderMain";
+import LoaderOverlay from "./LoaderOverlay";
 
 export default function Login() {
   const [error, setError] = useState(false);
@@ -24,14 +25,12 @@ export default function Login() {
 
     try {
       setLoginLoading(true);
-      const res = await fetch(
-        "https://pgsql-invoice.onrender.com/login",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(details),
-        }
-      );
+      console.log("first", loginLoading);
+      const res = await fetch("https://pgsql-invoice.onrender.com/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(details),
+      });
       if (!res.ok) {
         setError(true);
         setDetails({ email: "", password: "" });
@@ -46,13 +45,14 @@ export default function Login() {
       setError(true);
     } finally {
       setLoginLoading(false);
+      console.log("sec", loginLoading);
     }
   }
-
+  console.log("third", loginLoading);
   return (
     <div className="bg-gray-50 flex flex-col justify-center items-center min-h-screen md:flex-row">
-      {isLoading && loginLoading ? (
-        <LoaderMain />
+      {loginLoading ? (
+        <LoaderOverlay isLoading={loginLoading} message="Processing..." />
       ) : (
         <div className="w-full max-w-xs">
           <form
