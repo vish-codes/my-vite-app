@@ -53,10 +53,8 @@ const CreateInvoice = () => {
   const [deleteId, setDeleteId] = useState(null)
   const [projectsWithEmployees, setProjectsWithEmployees] = useState([])
   const [checkedProjects, setCheckedProjects] = useState(new Set())
+  const [employeeInputsByProject, setEmployeeInputsByProject] = useState({})
   const [checkedEmployees, setCheckedEmployees] = useState(new Set())
-  const [employeeInputs, setEmployeeInputs] = useState({})
-  // const [generatedInvoice, setGeneratedInvoice] = useState(null);
-  // const [deleteId, setDeleteId] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const onGridReady = (params) => {
@@ -79,7 +77,8 @@ const CreateInvoice = () => {
       if (!res.ok) throw new Error("Failed to fetch invoices")
       const data = await res.json()
       const rows = Array.isArray(data) ? data : []
-      setInvoices(rows)
+      const normalizedRows = rows.map((r) => ({ ...r, total_amount: Number(r.total_amount || 0) }));
+      setInvoices(normalizedRows)
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -180,21 +179,25 @@ const CreateInvoice = () => {
         normalized.flatMap((p) => (p.employees || []).map((e) => e.id))
       );
 
-      // Prepare inputs
-      const inputs = {};
+      const inputsByProject = {};
       normalized.forEach((p) => {
+        inputsByProject[p.id] = inputsByProject[p.id] || {};
         (p.employees || []).forEach((e) => {
-          inputs[e.id] = employeeInputs[e.id] || {
+          inputsByProject[p.id][e.id] = (employeeInputsByProject?.[p.id]?.[e.id]) || {
             days: "",
             paid_leaves: "",
             unpaid_leaves: "",
             over_time: "",
+            overtime_rate: e.overtime_amt || 0,
+            remark_days: "",
+            remark_overtime: "",
           };
         });
       });
+
       setCheckedProjects(projSet);
       setCheckedEmployees(empSet);
-      setEmployeeInputs(inputs);
+      setEmployeeInputsByProject(inputsByProject);
 
     } catch (err) {
       console.error(err)
@@ -230,7 +233,7 @@ const CreateInvoice = () => {
     setProjectsWithEmployees([])
     setCheckedProjects(new Set())
     setCheckedEmployees(new Set())
-    setEmployeeInputs({})
+    setEmployeeInputsByProject({})
     setShowForm(true)
     setValidationErrors({})
   }
@@ -283,7 +286,7 @@ const CreateInvoice = () => {
       setProjectsWithEmployees([])
       setCheckedProjects(new Set())
       setCheckedEmployees(new Set())
-      setEmployeeInputs({})
+      setEmployeeInputsByProject({})
       if (value) fetchClientDetails(value)
     }
   }
@@ -309,24 +312,24 @@ const CreateInvoice = () => {
 
       // 2 - build employee_entries
       const employee_entries = [];
-      Object.keys(employeeInputs).forEach((eid) => {
-        const idNum = Number(eid);  
-        if (checkedEmployees.has(idNum)) {
-          const vals = employeeInputs[eid] || {};
-          // Find employee full data from normalized projects
-          let empFullData = null;
-          projectsWithEmployees.forEach((p) => {
-            p.employees.forEach((e) => {
-              if (e.id === idNum) empFullData = e;
-            });
-          });
+      Object.keys(employeeInputsByProject).forEach((projIdStr) => {
+        const projId = Number(projIdStr);
+        const empMap = employeeInputsByProject[projId] || {};
+        Object.keys(empMap).forEach((eid) => {
+          const idNum = Number(eid);
+          if (!checkedEmployees.has(idNum)) return;
+
+          const vals = empMap[eid] || {};
+const proj = projectsWithEmployees.find((p) => p.id === projId);
+          const empFullData = proj?.employees.find((e) => e.id === idNum) || null;
 
           employee_entries.push({
+            project_id: projId,
             employee_id: idNum,
             project_emp_code: empFullData?.project_emp_code || null,
             billing_amt: empFullData?.billing_amt || 0,
             billing_method: empFullData?.billing_method || null,
-            overtime_amt: empFullData?.overtime_amt || 0,
+            overtime_amt: empFullData?.overtime_amt || vals.overtime_rate || 0,
 
             days: Number(vals.days || 0),
             paid_leaves: Number(vals.paid_leaves || 0),
@@ -336,8 +339,7 @@ const CreateInvoice = () => {
             remark_days: String(vals.remark_days || ""),
             remark_overtime: String(vals.remark_overtime || ""),
           });
-
-        }
+        });
       });
 
       // 3 - compute total
@@ -348,7 +350,7 @@ const CreateInvoice = () => {
         ...formData,
         project_ids,
         employees: employee_entries,
-        total_amount: totalAmount,
+        total_amount: Number(Math.round(totalAmount * 100) / 100), // rounded to 2 decimals
       };
 
       // 5 - Create or Update Invoice
@@ -379,11 +381,11 @@ const CreateInvoice = () => {
         client: clients.find((c) => String(c.id) === String(formData.client_id)) || null,
         company: companyDetails.company,
         projects: projectsWithEmployees,
-        employeesRaw: employeeInputs,
+        employeesRaw: employeeInputsByProject,
         employeeEntries: employee_entries,
         selectedProjects: Array.from(checkedProjects),
         selectedEmployees: Array.from(checkedEmployees),
-        totalAmount,
+        totalAmount: Number(Math.round(totalAmount * 100) / 100), // provide numeric total for GeneratePDF
       };
 
       setPdfInvoiceData(pdfData);
@@ -398,7 +400,7 @@ const CreateInvoice = () => {
       setProjectsWithEmployees([]);
       setCheckedProjects(new Set());
       setCheckedEmployees(new Set());
-      setEmployeeInputs({});
+      setEmployeeInputsByProject({});
 
       if (fetchInvoices) fetchInvoices();
     } catch (err) {
@@ -446,15 +448,17 @@ const CreateInvoice = () => {
       const invoiceFromServer = apiRes.invoice;
       const clientFromServer = apiRes.client;
 
+      const totalFromApi = apiRes.totalAmount ?? (invoiceFromServer?.total_amount ?? null);
+      const computedTotalFallback = computePreviewTotal(); // uses current UI state if needed
       const pdfData = {
         invoice: invoiceFromServer,
         client: clientFromServer,
         projects: apiRes.projects || projectsWithEmployees,
-        employeesRaw: apiRes.employeesRaw || employeeInputs,
+        employeesRaw: apiRes.employeesRaw || employeeInputsByProject,
         employeeEntries: apiRes.employeeEntries || [],
         selectedProjects: apiRes.selectedProjects || Array.from(checkedProjects),
         selectedEmployees: apiRes.selectedEmployees || Array.from(checkedEmployees),
-        totalAmount: apiRes.totalAmount ?? Number(invoiceFromServer.total_amount || 0),
+        totalAmount: Number(totalFromApi ?? computedTotalFallback),
       };
 
       setPdfInvoiceData(pdfData);
@@ -472,7 +476,6 @@ const CreateInvoice = () => {
     const next = new Set(checkedProjects)
     if (next.has(projectId)) {
       next.delete(projectId)
-      // when project unchecked, also uncheck its employees
       const proj = projectsWithEmployees.find((p) => p.id === projectId)
       if (proj?.employees) {
         const nextEmp = new Set(checkedEmployees)
@@ -481,7 +484,6 @@ const CreateInvoice = () => {
       }
     } else {
       next.add(projectId)
-      // when project checked, auto check its employees
       const proj = projectsWithEmployees.find((p) => p.id === projectId)
       if (proj?.employees) {
         const nextEmp = new Set(checkedEmployees)
@@ -501,68 +503,89 @@ const CreateInvoice = () => {
   }
 
   // handle per-employee numeric input change
-  const handleEmployeeInputChange = (employeeId, field, value) => {
-    setEmployeeInputs((prev) => ({
-      ...prev,
-      [employeeId]: {
-        ...((prev && prev[employeeId]) || { days: "", paid_leaves: "", unpaid_leaves: "", over_time: "" }),
-        [field]: value,
-      },
-    }))
+  const handleEmployeeInputChange = (projectId, employeeId, field, value) => {
+    setEmployeeInputsByProject((prev) => {
+      const byProj = { ...prev };
+      byProj[projectId] = { ...(byProj[projectId] || {}) };
+      byProj[projectId][employeeId] = { ...(byProj[projectId][employeeId] || { days: "", paid_leaves: "", unpaid_leaves: "", over_time: "" }), [field]: value };
+      return byProj;
+    })
   }
 
-  // compute total amount for preview
+  // compute totals aligned with GeneratePDF (returns final total including GST)
   const computePreviewTotal = () => {
-    let total = 0;
+    // Build resources-like array (project -> employee entries)
+    const resources = [];
 
-    Object.keys(employeeInputs).forEach((eid) => {
-      const idNum = Number(eid);
-      if (!checkedEmployees.has(idNum)) return;
+    Object.keys(employeeInputsByProject).forEach((projIdStr) => {
+      const projId = Number(projIdStr);
+      const proj = projectsWithEmployees.find((p) => p.id === projId);
+      if (!proj) return;
+      const empMap = employeeInputsByProject[projId] || {};
 
-      const vals = employeeInputs[eid] || {};
-      const days = Number(vals.days || 0);
-      const unpaid = Number(vals.unpaid_leaves || 0);
-      const paidLeave = Number(vals.paid_leaves || 0);
-      const overtime = Number(vals.over_time || 0);
+      Object.keys(empMap).forEach((eid) => {
+        const empId = Number(eid);
+        if (!checkedEmployees.has(empId)) return;
 
-      const payableDays = Math.max(0, days + paidLeave - unpaid);
+        const vals = empMap[eid] || {};
+        const workingDays = Number(vals.days || 0);
+        const unpaidLeaves = Number(vals.unpaid_leaves || 0);
+        const overtimeDays = Number(vals.over_time || 0);
 
-      // Find the project for the employee
-      const project = projectsWithEmployees.find((p) =>
-        p.employees.some((e) => e.id === idNum)
-      );
+        const billingMethod = (proj.billing_method || "days").toString().toLowerCase();
+        const billingAmt = Number(proj.billing_amt || 0);
+        const overtimeRate = Number(proj.overtime_amt || vals.overtime_rate || 0);
 
-      if (!project) return;
+        let perDaySal = 0;
+        let baseAmount = 0;
+        if (billingMethod === "month" || billingMethod === "monthly") {
+          perDaySal = workingDays > 0 ? Math.round(billingAmt / workingDays) : 0;
+          baseAmount = billingAmt - perDaySal * unpaidLeaves;
+        } else {
+          perDaySal = billingAmt;
+          baseAmount = perDaySal * workingDays;
+        }
 
-      const billingMethod = project.billing_method;
-      const rate = Number(project.billing_amt || 0);
-      const overtimeRate = Number(project.overtime_amt || 0);
+        baseAmount = Math.round(baseAmount);
+        const overtimeAmount = Math.round(overtimeRate * overtimeDays);
+        const totalEmpAmount = baseAmount + overtimeAmount;
 
-      let employeeTotal = 0;
-
-      // ----------------------------
-      //  Billing Method Conditions
-      // ----------------------------
-      if (billingMethod === "days") {
-        // Per-day calculation
-        employeeTotal = payableDays * rate + overtime * overtimeRate;
-
-      } else if (billingMethod === "hours") {
-        // Per-hour calculation
-        const hoursWorked = Number(vals.hours || 0);  // Make sure your UI sends this
-        employeeTotal = hoursWorked * rate + overtime * overtimeRate;
-
-      } else if (billingMethod === "monthly") {
-        // Monthly salary (rate is the monthly amount)
-        // No multiplication by days — full salary + overtime
-        employeeTotal = rate + overtime * overtimeRate;
-      }
-
-      total += employeeTotal;
+        resources.push({
+          projectId: projId,
+          employeeId: empId,
+          totalEmpAmount,
+        });
+      });
     });
 
-    return total;
+    // subtotal
+    const rawSubTotal = resources.reduce((acc, r) => acc + (Number(r.totalEmpAmount) || 0), 0);
+    const subTotal = Math.round(rawSubTotal);
+
+    // GST logic — reuse same rules as GeneratePDF
+    const gstRateStr = (clients.find((c) => String(c.id) === String(formData.client_id))?.tax_rate) || (clients.find((c) => String(c.id) === String(formData.client_id))?.gst_rate) || null;
+    // Fallback to form/client value if available in invoiceData
+    const gstRateFromInvoiceData = pdfInvoiceData?.client?.tax_rate ?? pdfInvoiceData?.client?.gst_rate;
+    const gstRateFinal = (gstRateFromInvoiceData ?? gstRateStr) || null;
+
+    let igst = 0, cgst = 0, sgst = 0, gstType = "NONE";
+
+    if (!gstRateFinal || gstRateFinal === "N/A") {
+      gstType = "NONE";
+    } else if (gstRateFinal.toString().includes("18")) {
+      gstType = "IGST";
+      igst = Math.round((subTotal * 18) / 100);
+    } else if (gstRateFinal.toString().includes("9")) {
+      gstType = "CGST_SGST";
+      cgst = Math.round((subTotal * 9) / 100);
+      sgst = Math.round((subTotal * 9) / 100);
+    }
+
+    const total = subTotal + igst + cgst + sgst;
+
+    return { subTotal, igst, cgst, sgst, total, gstType };
   };
+
 
   const columnDefs = [
     {
@@ -608,6 +631,10 @@ const CreateInvoice = () => {
       floatingFilter: true,
       sortable: true,
       resizable: true,
+      valueFormatter: (params) => {
+        const v = Number(params.value || 0);
+        return v.toLocaleString("en-IN", { style: "currency", currency: "INR" });
+      },
     },
     {
       field: "Actions",
@@ -780,7 +807,7 @@ const CreateInvoice = () => {
                             <div className="space-y-2">
                               {(proj.employees || []).map((emp) => {
                                 const empId = emp.id
-                                const empVals = employeeInputs[empId] || { days: "", paid_leaves: "", unpaid_leaves: "", over_time: "" }
+                                const empVals = (employeeInputsByProject[proj.id] && employeeInputsByProject[proj.id][empId]) || { days: "", paid_leaves: "", unpaid_leaves: "", over_time: "" }
                                 return (
                                   <div key={emp.id} className="grid grid-cols-12 gap-3 items-center bg-white p-2 rounded-md">
                                     <div className="col-span-3 flex items-center gap-2">
@@ -804,10 +831,10 @@ const CreateInvoice = () => {
                                           value={empVals.days}
                                           onChange={(e) => {
                                             const value = e.target.value;
-                                            handleEmployeeInputChange(empId, "days", value);
+                                            handleEmployeeInputChange(proj.id, empId, "days", value);
 
                                             if (value === "") {
-                                              handleEmployeeInputChange(empId, "remark_days", "");
+                                              handleEmployeeInputChange(proj.id, empId, "remark_days", "");
                                             }
                                           }}
                                           className="w-full px-2 py-2 border border-slate-200 rounded-md 
@@ -820,7 +847,7 @@ const CreateInvoice = () => {
                                             placeholder="Remark"
                                             value={empVals.remark_days}
                                             onChange={(e) =>
-                                              handleEmployeeInputChange(empId, "remark_days", e.target.value)
+                                              handleEmployeeInputChange(proj.id, empId, "remark_days", e.target.value)
                                             }
                                             className="w-full mt-2 px-2 py-2 border border-slate-200 rounded-md 
                      focus:outline-none focus:ring-1 focus:ring-blue-400"
@@ -836,7 +863,7 @@ const CreateInvoice = () => {
                                           placeholder="Paid Leaves"
                                           value={empVals.paid_leaves}
                                           onChange={(e) =>
-                                            handleEmployeeInputChange(empId, "paid_leaves", e.target.value)
+                                            handleEmployeeInputChange(proj.id, empId, "paid_leaves", e.target.value)
                                           }
                                           className="w-full px-2 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400"
                                         />
@@ -850,7 +877,7 @@ const CreateInvoice = () => {
                                           placeholder="Unpaid Leaves"
                                           value={empVals.unpaid_leaves}
                                           onChange={(e) =>
-                                            handleEmployeeInputChange(empId, "unpaid_leaves", e.target.value)
+                                            handleEmployeeInputChange(proj.id, empId, "unpaid_leaves", e.target.value)
                                           }
                                           className="w-full px-2 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400"
                                         />
@@ -865,10 +892,10 @@ const CreateInvoice = () => {
                                           value={empVals.over_time}
                                           onChange={(e) => {
                                             const value = e.target.value;
-                                            handleEmployeeInputChange(empId, "over_time", value);
+                                            handleEmployeeInputChange(proj.id, empId, "over_time", value);
 
                                             if (value === "") {
-                                              handleEmployeeInputChange(empId, "remark_overtime", "");
+                                              handleEmployeeInputChange(proj.id, empId, "remark_overtime", "");
                                             }
                                           }}
                                           className="w-full px-2 py-2 border border-slate-200 rounded-md 
@@ -881,7 +908,7 @@ const CreateInvoice = () => {
                                             placeholder="Remark"
                                             value={empVals.remark_overtime}
                                             onChange={(e) =>
-                                              handleEmployeeInputChange(empId, "remark_overtime", e.target.value)
+                                              handleEmployeeInputChange(proj.id, empId, "remark_overtime", e.target.value)
                                             }
                                             className="w-full mt-2 px-2 py-2 border border-slate-200 rounded-md 
                      focus:outline-none focus:ring-1 focus:ring-blue-400"
@@ -917,7 +944,7 @@ const CreateInvoice = () => {
                       setProjectsWithEmployees([])
                       setCheckedProjects(new Set())
                       setCheckedEmployees(new Set())
-                      setEmployeeInputs({})
+                      setEmployeeInputsByProject({})
                     }}
                     className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
                   >
@@ -992,7 +1019,7 @@ const CreateInvoice = () => {
                               {(p.employees || [])
                                 .filter((e) => checkedEmployees.has(e.id))
                                 .map((e) => {
-                                  const vals = employeeInputs[e.id] || {};
+                                  const vals = (employeeInputsByProject[p.id] && employeeInputsByProject[p.id][e.id]) || {};
                                   return (
                                     <div key={e.id} className="flex items-center justify-between">
                                       <div className="text-sm text-slate-900">{e.name}</div>
@@ -1012,7 +1039,10 @@ const CreateInvoice = () => {
                   <div>
                     <p className="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1">Total Amount</p>
                     <p className="text-lg font-semibold text-slate-900">
-                      {computePreviewTotal().toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                      {(() => {
+                        const t = computePreviewTotal();
+                        return (t.total || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" });
+                      })()}
                     </p>
                   </div>
                 </div>

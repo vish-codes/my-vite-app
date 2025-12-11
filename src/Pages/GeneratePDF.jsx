@@ -112,72 +112,72 @@ const GeneratePDF = ({ invoiceData }) => {
   const resourcesArr =
     employeeEntries && employeeEntries.length > 0
       ? employeeEntries.map((emp) => {
-          const project = projects?.find((p) =>
-            p.employees.some((e) => e.id === emp.employee_id)
-          );
+        const project =
+          projects?.find((p) => Number(p.id) === Number(emp.project_id)) ||
+          projects?.find((p) => (p.employees || []).some((e) => e.id === emp.employee_id));
 
-          const empInsideProject = project?.employees.find(
-            (e) => e.id === emp.employee_id
-          );
+        const empInsideProject =
+          (project?.employees || []).find((e) => e.id === emp.employee_id) || {};
 
-          const billingMethod =
-            empInsideProject?.billing_method?.toLowerCase() ||
-            emp.billing_method?.toLowerCase() ||
-            "days";
 
-          const billingAmt = Number(
-            empInsideProject?.billing_amt || emp.billing_amt || 0
-          );
+        const billingMethod =
+          empInsideProject?.billing_method?.toLowerCase() ||
+          emp.billing_method?.toLowerCase() ||
+          "days";
 
-          const workingDays = Number(emp.days || 0);
-          const unpaidLeaves = Number(emp.unpaid_leaves || 0);
+        const billingAmt = Number(
+          empInsideProject?.billing_amt || emp.billing_amt || 0
+        );
 
-          const overtimeRate = Number(
-            empInsideProject?.overtime_amt ||
-              emp.overtime_amt ||
-              emp.overtime_rate ||
-              0
-          );
-          const overtimeDays = Number(emp.over_time || 0);
-          const overtimeAmount = Math.round(overtimeRate * overtimeDays);
+        const workingDays = Number(emp.days || 0);
+        const unpaidLeaves = Number(emp.unpaid_leaves || 0);
 
-          let perDaySal = 0;
-          let baseAmount = 0;
+        const overtimeRate = Number(
+          empInsideProject?.overtime_amt ||
+          emp.overtime_amt ||
+          emp.overtime_rate ||
+          0
+        );
+        const overtimeDays = Number(emp.over_time || 0);
+        const overtimeAmount = Math.round(overtimeRate * overtimeDays);
 
-          if (billingMethod === "month") {
-            perDaySal =
-              workingDays > 0 ? Math.round(billingAmt / workingDays) : 0;
-            baseAmount = billingAmt - perDaySal * unpaidLeaves;
-          } else {
-            perDaySal = billingAmt;
-            baseAmount = perDaySal * workingDays;
-          }
+        let perDaySal = 0;
+        let baseAmount = 0;
 
-          baseAmount = Math.round(baseAmount);
-          const totalEmpAmount = baseAmount + overtimeAmount;
+        if (billingMethod === "month") {
+          perDaySal =
+            workingDays > 0 ? Math.round(billingAmt / workingDays) : 0;
+          baseAmount = billingAmt - perDaySal * unpaidLeaves;
+        } else {
+          perDaySal = billingAmt;
+          baseAmount = perDaySal * workingDays;
+        }
 
-          return {
-            userId: emp.project_emp_code,
-            employeeName: empInsideProject?.name || "Employee",
-            workingOn: project?.project_name || "Project",
-            sacCode: "9983",
+        baseAmount = Math.round(baseAmount);
+        const totalEmpAmount = baseAmount + overtimeAmount;
 
-            fromDate: formatToLongDate(commonDataForPdf.billingFrom),
-            toDate: formatToLongDate(commonDataForPdf.billingTo),
+        return {
+          userId: emp.project_emp_code,
+          employeeName: empInsideProject?.name || "Employee",
+          workingOn: project?.project_name || "Project",
+          sacCode: "9983",
 
-            days: workingDays,
-            unpaidLeaves,
-            payPerDay: perDaySal,
-            baseAmount,
-            overtimeRate,
-            overtimeDays,
-            overtimeAmount,
-            totalEmpAmount,
+          fromDate: formatToLongDate(commonDataForPdf.billingFrom),
+          toDate: formatToLongDate(commonDataForPdf.billingTo),
 
-            remark_days: emp.remark_days || "",
-            remark_overtime: emp.remark_overtime || "",
-          };
-        })
+          days: workingDays,
+          unpaidLeaves,
+          payPerDay: perDaySal,
+          baseAmount,
+          overtimeRate,
+          overtimeDays,
+          overtimeAmount,
+          totalEmpAmount,
+
+          remark_days: emp.remark_days || "",
+          remark_overtime: emp.remark_overtime || "",
+        };
+      })
       : [];
 
   /* ------------------ GST CALCULATION LOGIC ------------------ */
@@ -205,7 +205,7 @@ const GeneratePDF = ({ invoiceData }) => {
     }
 
     const total = subTotal + igst + cgst + sgst;
-// TODO
+    // TODO
     return { subTotal, igst, cgst, sgst, total, gstType };
   };
 
@@ -301,7 +301,7 @@ const GeneratePDF = ({ invoiceData }) => {
     const TABLE_WIDTH = 165;
     const TABLE_RIGHT = TABLE_LEFT + TABLE_WIDTH;
 
-    const tableTopY = billToBottomY + 8; 
+    const tableTopY = billToBottomY + 8;
     const headerBottomY = tableTopY + 7;
 
     doc.setFontSize(10.5);
@@ -344,11 +344,10 @@ const GeneratePDF = ({ invoiceData }) => {
       if (res.overtimeDays > 0 || res.remark_overtime) {
         const otText =
           res.overtimeDays > 0
-            ? `${res.overtimeDays} OT${
-                res.remark_overtime
-                  ? ` (${res.remark_overtime})`
-                  : ""
-              }`
+            ? `${res.overtimeDays} OT${res.remark_overtime
+              ? ` (${res.remark_overtime})`
+              : ""
+            }`
             : res.remark_overtime;
         doc.text(otText, TABLE_LEFT + 1.5, baseY + 10.5);
       }
