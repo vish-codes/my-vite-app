@@ -420,7 +420,7 @@ const GeneratePDF = ({ invoiceData }) => {
     // footer text
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text("Thanks for your business.", 28, tableBottomY + 8);
+    doc.text("Thanks for your business.", 30, tableBottomY + 8);
 
     // ---------- PREVIEW ----------
     const pdfBlob = doc.output("blob");
