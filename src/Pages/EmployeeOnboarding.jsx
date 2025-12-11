@@ -65,7 +65,7 @@ const EmployeeOnboarding = () => {
       const res = await fetch(API_URL)
       if (!res.ok) throw new Error("Failed to fetch employees")
       const data = await res.json()
-      setEmployees(data)
+      setEmployees(data || [])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to fetch employees")
     } finally {
@@ -73,16 +73,40 @@ const EmployeeOnboarding = () => {
     }
   }
 
-  const validateForm = () => {
-    const errors = {}
+const validateForm = () => {
+  const errors = {}
 
-    if (!formData.name.trim()) errors.name = "Employee name is required"
-    if (!formData.position.trim()) errors.position = "Position is required"
-    if (!formData.working_on.trim()) errors.working_on = "Working on is required"
-
-    setValidationErrors(errors)
-    return Object.keys(errors).length === 0
+  const nameVal = (formData.name || "").trim()
+  if (!nameVal) {
+    errors.name = "Employee name is required"
+  } else {
+    const namePattern = /^[A-Za-z\s]+$/
+    if (!namePattern.test(nameVal)) {
+      errors.name = "Name can only contain alphabets and spaces"
+    } else if (nameVal.length > 80) {
+      errors.name = "Name must be 80 characters or less"
+    }
   }
+
+  if (!formData.position.trim()) errors.position = "Position is required"
+  if (!formData.working_on.trim()) errors.working_on = "Working on is required"
+  const code = (formData.emp_code || "").toString().trim().toUpperCase()
+  if (!code) {
+    errors.emp_code = "Employee code is required (format: PSS123)"
+  } else if (!/^PSS\d+$/.test(code)) {
+    errors.emp_code = "Employee code must start with 'PSS' followed by digits (e.g. PSS105)"
+  } else {
+    const duplicate = employees.some(
+      (emp) =>
+        emp.emp_code?.toString().trim().toUpperCase() === code &&
+        emp.id !== editingId
+    )
+    if (duplicate) errors.emp_code = "This employee code is already in use"
+  }
+
+  setValidationErrors(errors)
+  return Object.keys(errors).length === 0
+}
 
   const handleOpenForm = () => {
     setFormData(emptyForm)
@@ -97,7 +121,7 @@ const EmployeeOnboarding = () => {
       name: employee.name || "",
       position: employee.position || "",
       working_on: employee.working_on || "",
-      emp_code: employee.emp_code || "",
+      emp_code: (employee.emp_code || "").toString().trim().toUpperCase(),
     })
     setEditingId(employee.id)
     setShowForm(true)
@@ -105,17 +129,71 @@ const EmployeeOnboarding = () => {
     setValidationErrors({})
   }
 
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData({ ...formData, [name]: value })
+const handleChange = (e) => {
+  const { name, value } = e.target
+
+  if (name === "emp_code") {
+    const normalized = value.toString().toUpperCase().replace(/\s+/g, "")
+    setFormData({ ...formData, [name]: normalized })
     if (validationErrors[name]) {
       setValidationErrors({ ...validationErrors, [name]: "" })
     }
+    return
   }
+
+  if (name === "name") {
+    const namePattern = /^[A-Za-z\s]*$/
+    if (!namePattern.test(value)) {
+      setValidationErrors((prev) => ({
+        ...prev,
+        name: "Name can only contain alphabets and spaces",
+      }))
+    } else {
+      if (validationErrors.name) {
+        setValidationErrors({ ...validationErrors, name: "" })
+      }
+    }
+  }
+
+  setFormData({ ...formData, [name]: value })
+}
+
 
   const handleFormSubmit = (e) => {
     e.preventDefault()
-    if (!validateForm()) return
+    setFormData((prev) => ({ ...prev, emp_code: (prev.emp_code || "").toString().trim().toUpperCase() }))
+    const normalizedForm = {
+      ...formData,
+      emp_code: (formData.emp_code || "").toString().trim().toUpperCase(),
+    }
+     setFormData(normalizedForm)
+   const errors = {}
+    if (!normalizedForm.name.trim()) errors.name = "Employee name is required"
+    if (!normalizedForm.position.trim()) errors.position = "Position is required"
+    if (!normalizedForm.working_on.trim()) errors.working_on = "Working on is required"
+
+    const code = (normalizedForm.emp_code || "").toString().trim().toUpperCase()
+    if (!code) {
+      errors.emp_code = "Employee code is required (format: PSS123)"
+    } else {
+      const pattern = /^PSS\d+$/
+      if (!pattern.test(code)) {
+        errors.emp_code = "Employee code must start with 'PSS' followed by digits (e.g. PSS105)"
+      } else {
+        const duplicate = employees.some(
+          (emp) =>
+            (emp.emp_code || "").toString().trim().toUpperCase() === code &&
+            emp.id !== editingId,
+        )
+        if (duplicate) errors.emp_code = "This employee code is already in use"
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors)
+      return
+    }
+    setValidationErrors({})
     setShowPreview(true)
     setShowForm(false)
   }
@@ -126,18 +204,41 @@ const EmployeeOnboarding = () => {
   }
 
   const handleFinalSubmit = async () => {
+    if (!validateForm()) {
+      setShowForm(true)
+      setShowPreview(false)
+      return
+    }
+
     setLoading(true)
     try {
       const method = editingId ? "PUT" : "POST"
       const url = editingId ? `${API_URL}/${editingId}` : API_URL
 
+      const payload = {
+        ...formData,
+        emp_code: (formData.emp_code || "").toString().trim().toUpperCase(),
+        name: (formData.name || "").toString().trim(),
+        position: (formData.position || "").toString().trim(),
+        working_on: (formData.working_on || "").toString().trim(),
+      }
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       })
 
-      if (!res.ok) throw new Error("Failed to save employee")
+      if (!res.ok) {
+        let message = "Failed to save employee"
+        try {
+          const body = await res.json()
+          if (body && body.message) message = body.message
+        } catch (e) {
+          /* ignore */
+        }
+        throw new Error(message)
+      }
 
       await fetchEmployees()
       setShowPreview(false)
@@ -170,12 +271,13 @@ const EmployeeOnboarding = () => {
     }
   }
 
-  const filteredEmployees = employees.filter(
-    (employee) =>
-      employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      employee.position.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      employee.emp_code.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+  const filteredEmployees = employees.filter((employee) => {
+    const q = searchQuery.toLowerCase()
+    const name = (employee.name || "").toString().toLowerCase()
+    const position = (employee.position || "").toString().toLowerCase()
+    const code = (employee.emp_code || "").toString().toLowerCase()
+    return name.includes(q) || position.includes(q) || code.includes(q)
+  })
 
   const columnDefs = [
     {
@@ -326,7 +428,7 @@ const EmployeeOnboarding = () => {
                   {/* Employee Code */}
                   <div>
                     <label className="block text-sm font-medium text-slate-900 mb-2">
-                      Employee Code <span className="text-slate-500 text-xs">(Optional)</span>
+                      Employee Code <span className="text-red-600">*</span>
                     </label>
                     <input
                       type="text"
@@ -338,9 +440,7 @@ const EmployeeOnboarding = () => {
                         validationErrors.emp_code ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
                       }`}
                     />
-                    {validationErrors.emp_code && (
-                      <p className="text-red-600 text-sm mt-1">{validationErrors.emp_code}</p>
-                    )}
+                    {validationErrors.emp_code && <p className="text-red-600 text-sm mt-1">{validationErrors.emp_code}</p>}
                   </div>
                 </div>
 
@@ -454,9 +554,7 @@ const EmployeeOnboarding = () => {
                   Employees <span className="text-slate-500 font-normal">({filteredEmployees.length})</span>
                 </h3>
                 <p className="text-sm text-slate-600 mt-1">
-                  {loading
-                    ? "Loading employees..."
-                    : `Managing ${filteredEmployees.length} employee${filteredEmployees.length !== 1 ? "s" : ""}`}
+                  {loading ? "Loading employees..." : `Managing ${filteredEmployees.length} employee${filteredEmployees.length !== 1 ? "s" : ""}`}
                 </p>
               </div>
               <div className="ag-theme-quartz" style={{ height: "500px", width: "100%" }}>
