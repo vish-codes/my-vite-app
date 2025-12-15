@@ -546,7 +546,7 @@ const CreateInvoice = () => {
         baseAmount = Math.round(baseAmount);
         const overtimeAmount = Math.round(overtimeRate * overtimeDays);
         const totalEmpAmount = baseAmount + overtimeAmount;
-    
+
         resources.push({
           projectId: projId,
           employeeId: empId,
@@ -838,47 +838,68 @@ const CreateInvoice = () => {
                    focus:outline-none focus:ring-1 focus:ring-blue-400"
                                         />
 
-                                        {empVals.days !== "" && (
-                                          <input
-                                            type="text"
-                                            placeholder="Remark"
-                                            value={empVals.remark_days}
-                                            onChange={(e) =>
-                                              handleEmployeeInputChange(proj.id, empId, "remark_days", e.target.value)
-                                            }
-                                            className="w-full mt-2 px-2 py-2 border border-slate-200 rounded-md 
-                     focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                          />
-                                        )}
+
                                       </div>
 
                                       {/* ⭐ Paid Leaves */}
-                                      <div>
+                                      <div className="flex flex-col">
                                         <input
                                           type="text"
                                           inputMode="numeric"
                                           placeholder="Paid Leaves"
                                           value={empVals.paid_leaves}
                                           onChange={(e) =>
-                                            handleEmployeeInputChange(proj.id, empId, "paid_leaves", e.target.value)
+                                            handleEmployeeInputChange(
+                                              proj.id,
+                                              empId,
+                                              "paid_leaves",
+                                              e.target.value
+                                            )
                                           }
-                                          className="w-full px-2 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                          className="w-full px-2 py-2 border border-slate-200 rounded-md 
+focus:outline-none focus:ring-1 focus:ring-blue-400"
                                         />
                                       </div>
 
                                       {/* ⭐ Unpaid Leaves */}
-                                      <div>
+                                      <div className="flex flex-col">
                                         <input
                                           type="text"
                                           inputMode="numeric"
                                           placeholder="Unpaid Leaves"
                                           value={empVals.unpaid_leaves}
                                           onChange={(e) =>
-                                            handleEmployeeInputChange(proj.id, empId, "unpaid_leaves", e.target.value)
+                                            handleEmployeeInputChange(
+                                              proj.id,
+                                              empId,
+                                              "unpaid_leaves",
+                                              e.target.value
+                                            )
                                           }
-                                          className="w-full px-2 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                          className="w-full px-2 py-2 border border-slate-200 rounded-md 
+focus:outline-none focus:ring-1 focus:ring-blue-400"
                                         />
+
+                                        {/* ⭐ Remark appears ONLY if paid or unpaid leaves entered */}
+                                        {(empVals.paid_leaves || empVals.unpaid_leaves) && (
+                                          <input
+                                            type="text"
+                                            placeholder="Remark"
+                                            value={empVals.remark_days || ""}
+                                            onChange={(e) =>
+                                              handleEmployeeInputChange(
+                                                proj.id,
+                                                empId,
+                                                "remark_days",
+                                                e.target.value
+                                              )
+                                            }
+                                            className="w-full mt-2 px-2 py-2 border border-slate-200 rounded-md 
+focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                          />
+                                        )}
                                       </div>
+
 
                                       {/* ⭐ Overtime + Remark */}
                                       <div className="flex flex-col">
