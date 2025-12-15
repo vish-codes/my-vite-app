@@ -98,7 +98,6 @@ const CreateInvoice = () => {
     }
   }
 
-  // Fetch client details (projects + employees) when a client is selected
   const fetchClientDetails = async (clientId) => {
     if (!clientId) return
     setLoading(true)
@@ -281,7 +280,6 @@ const CreateInvoice = () => {
     if (validationErrors[name]) {
       setValidationErrors({ ...validationErrors, [name]: "" })
     }
-    // if client dropdown changed, fetch details
     if (name === "client_id") {
       setProjectsWithEmployees([])
       setCheckedProjects(new Set())
@@ -320,7 +318,7 @@ const CreateInvoice = () => {
           if (!checkedEmployees.has(idNum)) return;
 
           const vals = empMap[eid] || {};
-const proj = projectsWithEmployees.find((p) => p.id === projId);
+          const proj = projectsWithEmployees.find((p) => p.id === projId);
           const empFullData = proj?.employees.find((e) => e.id === idNum) || null;
 
           employee_entries.push({
@@ -350,7 +348,7 @@ const proj = projectsWithEmployees.find((p) => p.id === projId);
         ...formData,
         project_ids,
         employees: employee_entries,
-        total_amount: Number(Math.round(totalAmount * 100) / 100), // rounded to 2 decimals
+        total_amount: Number(Math.round(totalAmount.total * 100) / 100),
       };
 
       // 5 - Create or Update Invoice
@@ -449,7 +447,7 @@ const proj = projectsWithEmployees.find((p) => p.id === projId);
       const clientFromServer = apiRes.client;
 
       const totalFromApi = apiRes.totalAmount ?? (invoiceFromServer?.total_amount ?? null);
-      const computedTotalFallback = computePreviewTotal(); // uses current UI state if needed
+      const computedTotalFallback = computePreviewTotal();
       const pdfData = {
         invoice: invoiceFromServer,
         client: clientFromServer,
@@ -512,9 +510,8 @@ const proj = projectsWithEmployees.find((p) => p.id === projId);
     })
   }
 
-  // compute totals aligned with GeneratePDF (returns final total including GST)
   const computePreviewTotal = () => {
-    // Build resources-like array (project -> employee entries)
+
     const resources = [];
 
     Object.keys(employeeInputsByProject).forEach((projIdStr) => {
@@ -549,7 +546,7 @@ const proj = projectsWithEmployees.find((p) => p.id === projId);
         baseAmount = Math.round(baseAmount);
         const overtimeAmount = Math.round(overtimeRate * overtimeDays);
         const totalEmpAmount = baseAmount + overtimeAmount;
-
+    
         resources.push({
           projectId: projId,
           employeeId: empId,
