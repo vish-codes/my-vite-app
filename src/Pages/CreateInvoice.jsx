@@ -383,7 +383,7 @@ const CreateInvoice = () => {
         employeeEntries: employee_entries,
         selectedProjects: Array.from(checkedProjects),
         selectedEmployees: Array.from(checkedEmployees),
-        totalAmount: Number(Math.round(totalAmount.total * 100) / 100), // provide numeric total for GeneratePDF
+        totalAmount: Number(Math.round(totalAmount.total * 100) / 100),
       };
 
       setPdfInvoiceData(pdfData);
