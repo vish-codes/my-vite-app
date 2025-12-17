@@ -328,7 +328,6 @@ const CreateInvoice = () => {
             billing_amt: empFullData?.billing_amt || 0,
             billing_method: empFullData?.billing_method || null,
             overtime_amt: empFullData?.overtime_amt || vals.overtime_rate || 0,
-
             days: Number(vals.days || 0),
             paid_leaves: Number(vals.paid_leaves || 0),
             unpaid_leaves: Number(vals.unpaid_leaves || 0),
@@ -336,6 +335,7 @@ const CreateInvoice = () => {
             overtime_rate: Number(vals.overtime_rate || 0),
             remark_days: String(vals.remark_days || ""),
             remark_overtime: String(vals.remark_overtime || ""),
+            total_days: Number(vals.total_days || 0),
           });
         });
       });
@@ -383,7 +383,7 @@ const CreateInvoice = () => {
         employeeEntries: employee_entries,
         selectedProjects: Array.from(checkedProjects),
         selectedEmployees: Array.from(checkedEmployees),
-        totalAmount: Number(Math.round(totalAmount * 100) / 100), // provide numeric total for GeneratePDF
+        totalAmount: Number(Math.round(totalAmount.total * 100) / 100), // provide numeric total for GeneratePDF
       };
 
       setPdfInvoiceData(pdfData);
@@ -536,11 +536,12 @@ const CreateInvoice = () => {
         let perDaySal = 0;
         let baseAmount = 0;
         if (billingMethod === "month" || billingMethod === "monthly") {
-          perDaySal = workingDays > 0 ? Math.round(billingAmt / workingDays) : 0;
-          baseAmount = billingAmt - perDaySal * unpaidLeaves;
-        } else {
-          perDaySal = billingAmt;
-          baseAmount = perDaySal * workingDays;
+          const totalDays = Number(vals.total_days || 0);
+
+          if (totalDays > 0) {
+            perDaySal = Math.round(billingAmt / totalDays);
+            baseAmount = billingAmt - perDaySal * unpaidLeaves;
+          }
         }
 
         baseAmount = Math.round(baseAmount);
@@ -819,26 +820,45 @@ const CreateInvoice = () => {
 
                                     <div className="col-span-9 grid grid-cols-4 gap-2">
 
-                                      {/* ⭐ Working Days + Remark */}
+                                      {/* ⭐ Working Days */}
                                       <div className="flex flex-col">
                                         <input
                                           type="text"
                                           inputMode="numeric"
                                           placeholder="Working Days"
                                           value={empVals.days}
-                                          onChange={(e) => {
-                                            const value = e.target.value;
-                                            handleEmployeeInputChange(proj.id, empId, "days", value);
-
-                                            if (value === "") {
-                                              handleEmployeeInputChange(proj.id, empId, "remark_days", "");
-                                            }
-                                          }}
+                                          onChange={(e) =>
+                                            handleEmployeeInputChange(
+                                              proj.id,
+                                              empId,
+                                              "days",
+                                              e.target.value
+                                            )
+                                          }
                                           className="w-full px-2 py-2 border border-slate-200 rounded-md 
-                   focus:outline-none focus:ring-1 focus:ring-blue-400"
+focus:outline-none focus:ring-1 focus:ring-blue-400"
                                         />
 
-
+                                        {/* ⭐ Total Days (ONLY for Monthly billing) */}
+                                        {(proj.billing_method === "month" ||
+                                          proj.billing_method === "monthly") && (
+                                            <input
+                                              type="text"
+                                              inputMode="numeric"
+                                              placeholder="Total days"
+                                              value={empVals.total_days || ""}
+                                              onChange={(e) =>
+                                                handleEmployeeInputChange(
+                                                  proj.id,
+                                                  empId,
+                                                  "total_days",
+                                                  e.target.value
+                                                )
+                                              }
+                                              className="w-full mt-2 px-2 py-2 border border-slate-200 rounded-md 
+focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                            />
+                                          )}
                                       </div>
 
                                       {/* ⭐ Paid Leaves */}
