@@ -653,7 +653,7 @@ const ProjectOnboarding = () => {
                                 Method
                               </label>
                               <div className="flex border border-slate-300 rounded overflow-hidden">
-                                {["days", "hours", "fixed"].map((method) => (
+                                {["days", "hours", "month"].map((method) => (
                                   <button
                                     key={method}
                                     type="button"
@@ -669,7 +669,7 @@ const ProjectOnboarding = () => {
                                         : "bg-white text-slate-600 hover:bg-slate-50"
                                       }`}
                                   >
-                                    {method === "fixed" ? "Month" : method}
+                                    {method === "month" ? "Month" : method}
                                   </button>
                                 ))}
                               </div>

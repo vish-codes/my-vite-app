@@ -140,15 +140,17 @@ const GeneratePDF = ({ invoiceData }) => {
         );
         const overtimeDays = Number(emp.over_time || 0);
         const overtimeAmount = Math.round(overtimeRate * overtimeDays);
+        const totalDays = Number(emp.total_days || 0);
 
         let perDaySal = 0;
         let baseAmount = 0;
 
         if (billingMethod === "month") {
-          perDaySal =
-            workingDays > 0 ? Math.round(billingAmt / workingDays) : 0;
+          perDaySal = Math.round(billingAmt / totalDays);
           baseAmount = billingAmt - perDaySal * unpaidLeaves;
-        } else {
+
+        }
+        else {
           perDaySal = billingAmt;
           baseAmount = perDaySal * workingDays;
         }
